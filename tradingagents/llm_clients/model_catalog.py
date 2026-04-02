@@ -73,6 +73,14 @@ MODEL_OPTIONS: ProviderModeOptions = {
             ("NVIDIA Nemotron 3 Nano 30B (free)", "nvidia/nemotron-3-nano-30b-a3b:free"),
         ],
     },
+    "dashscope": {
+        "quick": [
+            ("GLM-5 - DashScope chat/completions", "glm-5"),
+        ],
+        "deep": [
+            ("GLM-5 - DashScope chat/completions", "glm-5"),
+        ],
+    },
     "ollama": {
         "quick": [
             ("Qwen3:latest (8B, local)", "qwen3:latest"),

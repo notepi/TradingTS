@@ -217,3 +217,8 @@ __marimo__/
 
 # Cache
 **/data_cache/
+
+# Project specific
+eval_results/
+srcMO/
+.DS_Store
