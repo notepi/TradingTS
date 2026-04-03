@@ -25,11 +25,13 @@ DEFAULT_CONFIG = {
     "max_recur_limit": 100,
     # Data vendor configuration
     # Category-level configuration (default for all tools in category)
+    # Default project mode: A-share market data via Tushare citydata proxy
+    # Options: alpha_vantage, yfinance, tushare
     "data_vendors": {
-        "core_stock_apis": "yfinance",       # Options: alpha_vantage, yfinance
-        "technical_indicators": "yfinance",  # Options: alpha_vantage, yfinance
-        "fundamental_data": "yfinance",      # Options: alpha_vantage, yfinance
-        "news_data": "yfinance",             # Options: alpha_vantage, yfinance
+        "core_stock_apis": "tushare",        # Default A-share OHLCV source
+        "technical_indicators": "tushare",   # Default A-share technical indicators
+        "fundamental_data": "tushare",       # Default A-share fundamentals and statements
+        "news_data": "tushare",              # Placeholder responses in Tushare citydata mode
     },
     # Tool-level configuration (takes precedence over category-level)
     "tool_vendors": {

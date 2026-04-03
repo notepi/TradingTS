@@ -4,11 +4,15 @@ from typing import List, Optional, Tuple, Dict
 from rich.console import Console
 
 from cli.models import AnalystType
+from tradingagents.dataflows.a_share_symbols import (
+    VALIDATION_MESSAGE,
+    normalize_a_share_symbol,
+)
 from tradingagents.llm_clients.model_catalog import get_model_options
 
 console = Console()
 
-TICKER_INPUT_EXAMPLES = "Examples: SPY, CNC.TO, 7203.T, 0700.HK"
+TICKER_INPUT_EXAMPLES = "Examples: 600519.SH, 000001.SZ, 688333.SH, 688333.SS, 600519"
 
 ANALYST_ORDER = [
     ("Market Analyst", AnalystType.MARKET),
@@ -21,8 +25,8 @@ ANALYST_ORDER = [
 def get_ticker() -> str:
     """Prompt the user to enter a ticker symbol."""
     ticker = questionary.text(
-        f"Enter the exact ticker symbol to analyze ({TICKER_INPUT_EXAMPLES}):",
-        validate=lambda x: len(x.strip()) > 0 or "Please enter a valid ticker symbol.",
+        f"Enter the A-share ticker to analyze ({TICKER_INPUT_EXAMPLES}):",
+        validate=lambda x: _validate_a_share_ticker(x),
         style=questionary.Style(
             [
                 ("text", "fg:green"),
@@ -39,8 +43,17 @@ def get_ticker() -> str:
 
 
 def normalize_ticker_symbol(ticker: str) -> str:
-    """Normalize ticker input while preserving exchange suffixes."""
-    return ticker.strip().upper()
+    """Normalize ticker input for A-share-only Tushare citydata mode."""
+    return normalize_a_share_symbol(ticker)
+
+
+def _validate_a_share_ticker(ticker: str) -> bool | str:
+    """Validate A-share ticker input for CLI prompts."""
+    try:
+        normalize_ticker_symbol(ticker)
+    except ValueError as exc:
+        return str(exc) or VALIDATION_MESSAGE
+    return True
 
 
 def get_analysis_date() -> str:

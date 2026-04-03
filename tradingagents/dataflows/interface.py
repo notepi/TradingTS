@@ -24,6 +24,23 @@ from .alpha_vantage import (
 )
 from .alpha_vantage_common import AlphaVantageRateLimitError
 
+# Tushare 数据源 (通过 citydata.club 代理)
+try:
+    from .tushare_data import (
+        get_Tushare_data_online,
+        get_stock_stats_indicators_window as get_tushare_indicators,
+        get_fundamentals as get_tushare_fundamentals,
+        get_balance_sheet as get_tushare_balance_sheet,
+        get_cashflow as get_tushare_cashflow,
+        get_income_statement as get_tushare_income_statement,
+        get_insider_transactions as get_tushare_insider_transactions,
+        get_news as get_tushare_news,
+        get_global_news as get_tushare_global_news,
+    )
+    TUSHARE_AVAILABLE = True
+except ImportError:
+    TUSHARE_AVAILABLE = False
+
 # Configuration and routing logic
 from .config import get_config
 
@@ -63,6 +80,7 @@ TOOLS_CATEGORIES = {
 VENDOR_LIST = [
     "yfinance",
     "alpha_vantage",
+    "tushare",
 ]
 
 # Mapping of methods to their vendor-specific implementations
@@ -71,41 +89,50 @@ VENDOR_METHODS = {
     "get_stock_data": {
         "alpha_vantage": get_alpha_vantage_stock,
         "yfinance": get_YFin_data_online,
+        "tushare": get_Tushare_data_online if TUSHARE_AVAILABLE else None,
     },
     # technical_indicators
     "get_indicators": {
         "alpha_vantage": get_alpha_vantage_indicator,
         "yfinance": get_stock_stats_indicators_window,
+        "tushare": get_tushare_indicators if TUSHARE_AVAILABLE else None,
     },
     # fundamental_data
     "get_fundamentals": {
         "alpha_vantage": get_alpha_vantage_fundamentals,
         "yfinance": get_yfinance_fundamentals,
+        "tushare": get_tushare_fundamentals if TUSHARE_AVAILABLE else None,
     },
     "get_balance_sheet": {
         "alpha_vantage": get_alpha_vantage_balance_sheet,
         "yfinance": get_yfinance_balance_sheet,
+        "tushare": get_tushare_balance_sheet if TUSHARE_AVAILABLE else None,
     },
     "get_cashflow": {
         "alpha_vantage": get_alpha_vantage_cashflow,
         "yfinance": get_yfinance_cashflow,
+        "tushare": get_tushare_cashflow if TUSHARE_AVAILABLE else None,
     },
     "get_income_statement": {
         "alpha_vantage": get_alpha_vantage_income_statement,
         "yfinance": get_yfinance_income_statement,
+        "tushare": get_tushare_income_statement if TUSHARE_AVAILABLE else None,
     },
     # news_data
     "get_news": {
         "alpha_vantage": get_alpha_vantage_news,
         "yfinance": get_news_yfinance,
+        "tushare": get_tushare_news if TUSHARE_AVAILABLE else None,
     },
     "get_global_news": {
         "yfinance": get_global_news_yfinance,
         "alpha_vantage": get_alpha_vantage_global_news,
+        "tushare": get_tushare_global_news if TUSHARE_AVAILABLE else None,
     },
     "get_insider_transactions": {
         "alpha_vantage": get_alpha_vantage_insider_transactions,
         "yfinance": get_yfinance_insider_transactions,
+        "tushare": get_tushare_insider_transactions if TUSHARE_AVAILABLE else None,
     },
 }
 
@@ -152,6 +179,11 @@ def route_to_vendor(method: str, *args, **kwargs):
             continue
 
         vendor_impl = VENDOR_METHODS[method][vendor]
+
+        # Skip if implementation is None (vendor not available)
+        if vendor_impl is None:
+            continue
+
         impl_func = vendor_impl[0] if isinstance(vendor_impl, list) else vendor_impl
 
         try:

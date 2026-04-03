@@ -8,7 +8,7 @@
 
 TradingAgents 是一个多代理交易框架，模拟真实交易公司的运作方式。通过部署专门的 LLM 代理团队：基本面分析师、情绪分析师、技术分析师、交易员、风险管理团队，协同评估市场状况并做出交易决策。
 
-**技术栈**: Python 3.10+, LangGraph, LangChain, yfinance
+**技术栈**: Python 3.10+, LangGraph, LangChain, Tushare citydata proxy
 
 **入口点**:
 - CLI: `tradingagents` 命令或 `python -m cli.main`
@@ -62,8 +62,9 @@ TradingAgents/
 ### 1. Environment Setup
 
 ```bash
-# 已有 .env 文件，确保 API Key 已配置
+# 已有 .env 文件，确保 LLM API Key 与 Tushare token 已配置
 # 支持的提供商：openai, google, anthropic, xai, openrouter, dashscope, ollama
+# 数据源默认：tushare (CITYDATA_TOKEN / TUSHARE_TOKEN)
 
 # 激活虚拟环境
 source .venv/bin/activate  # 或 conda activate tradingagents
@@ -86,12 +87,12 @@ from dotenv import load_dotenv
 load_dotenv()
 
 config = DEFAULT_CONFIG.copy()
-config["llm_provider"] = "openai"
-config["deep_think_llm"] = "gpt-5.4-mini"
-config["quick_think_llm"] = "gpt-5.4-mini"
+config["llm_provider"] = "dashscope"
+config["deep_think_llm"] = "glm-5"
+config["quick_think_llm"] = "glm-5"
 
 ta = TradingAgentsGraph(debug=True, config=config)
-_, decision = ta.propagate("NVDA", "2024-05-10")
+_, decision = ta.propagate("600519.SH", "2024-05-10")
 print(decision)
 ```
 
@@ -111,7 +112,7 @@ print(decision)
 
 ### Data Vendors
 
-默认使用 `yfinance`（免费，无需额外 API Key）。可选 `alpha_vantage`（需 ALPHA_VANTAGE_API_KEY）。
+默认使用 `tushare` citydata 代理，需配置 `CITYDATA_TOKEN` 或 `TUSHARE_TOKEN`。当前项目定位为 A 股模式；新闻、全球新闻和 insider 在 Tushare 模式下返回占位提示文本。
 
 ### Key Config Options
 
@@ -147,7 +148,7 @@ pytest --cov=tradingagents
 ## Notes
 
 - 项目用于研究目的，不构成投资建议
-- 默认使用 yfinance，无额外费用
+- 默认使用 Tushare citydata 代理，需配置 token
 - LLM 调用会产生 API 费用，注意控制成本
 - `eval_results/` 和 `srcMO/` 是临时目录，已忽略
 
@@ -161,3 +162,4 @@ pytest --cov=tradingagents
 4. **工作流优化** - 支持跳过辩论和风险讨论环节（设置 `max_debate_rounds=0` 或 `max_risk_discuss_rounds=0`）
 5. **技术指标优化** - 从最多 8 个指标减少到 4 个，聚焦关键信号
 6. **报告格式简化** - 更简洁清晰的报告输出
+7. **默认数据源切换为 Tushare citydata** - 项目当前默认面向 A 股，保持 graph 与 agent 接口不变

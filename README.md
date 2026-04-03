@@ -57,6 +57,8 @@
 
 TradingAgents is a multi-agent trading framework that mirrors the dynamics of real-world trading firms. By deploying specialized LLM-powered agents: from fundamental analysts, sentiment experts, and technical analysts, to trader, risk management team, the platform collaboratively evaluates market conditions and informs trading decisions. Moreover, these agents engage in dynamic discussions to pinpoint the optimal strategy.
 
+This fork defaults to A-share market data through the Tushare citydata proxy. Company news, global news, and insider transactions remain placeholder responses in Tushare mode so the workflow stays stable without changing the graph structure.
+
 <p align="center">
   <img src="assets/schema.png" style="width: 100%; height: auto;">
 </p>
@@ -120,7 +122,7 @@ pip install .
 
 ### Required APIs
 
-TradingAgents supports multiple LLM providers. Set the API key for your chosen provider:
+TradingAgents supports multiple LLM providers. Set the API key for your chosen provider, plus a Tushare citydata token for the default A-share data mode:
 
 ```bash
 export OPENAI_API_KEY=...          # OpenAI (GPT)
@@ -129,6 +131,8 @@ export ANTHROPIC_API_KEY=...       # Anthropic (Claude)
 export XAI_API_KEY=...             # xAI (Grok)
 export OPENROUTER_API_KEY=...      # OpenRouter
 export ALPHA_VANTAGE_API_KEY=...   # Alpha Vantage
+export CITYDATA_TOKEN=...          # Tushare citydata proxy (default market data)
+# or export TUSHARE_TOKEN=...
 ```
 
 For local models, configure Ollama with `llm_provider: "ollama"` in your config.
@@ -145,7 +149,7 @@ Launch the interactive CLI:
 tradingagents          # installed command
 python -m cli.main     # alternative: run directly from source
 ```
-You will see a screen where you can select your desired tickers, analysis date, LLM provider, research depth, and more.
+You will see a screen where you can select your desired A-share tickers, analysis date, LLM provider, research depth, and more. Supported inputs include `600519.SH`, `000001.SZ`, `688333.SH`, `688333.SS`, and bare 6-digit mainland codes such as `600519`.
 
 <p align="center">
   <img src="assets/cli/cli_init.png" width="100%" style="display: inline-block; margin: 0 2%;">
@@ -165,11 +169,11 @@ An interface will appear showing results as they load, letting you track the age
 
 ### Implementation Details
 
-We built TradingAgents with LangGraph to ensure flexibility and modularity. The framework supports multiple LLM providers: OpenAI, Google, Anthropic, xAI, OpenRouter, and Ollama.
+We built TradingAgents with LangGraph to ensure flexibility and modularity. The framework supports multiple LLM providers: OpenAI, Google, Anthropic, xAI, OpenRouter, DashScope, and Ollama. This fork defaults to Tushare citydata for A-share OHLCV, indicators, and fundamentals.
 
 ### Python Usage
 
-To use TradingAgents inside your code, you can import the `tradingagents` module and initialize a `TradingAgentsGraph()` object. The `.propagate()` function will return a decision. You can run `main.py`, here's also a quick example:
+To use TradingAgents inside your code, you can import the `tradingagents` module and initialize a `TradingAgentsGraph()` object. The `.propagate()` function will return a decision. `DEFAULT_CONFIG` now targets A-share data via Tushare citydata, so make sure `CITYDATA_TOKEN` or `TUSHARE_TOKEN` is configured before you run it.
 
 ```python
 from tradingagents.graph.trading_graph import TradingAgentsGraph
@@ -178,7 +182,7 @@ from tradingagents.default_config import DEFAULT_CONFIG
 ta = TradingAgentsGraph(debug=True, config=DEFAULT_CONFIG.copy())
 
 # forward propagate
-_, decision = ta.propagate("NVDA", "2026-01-15")
+_, decision = ta.propagate("600519.SH", "2026-01-15")
 print(decision)
 ```
 
@@ -189,13 +193,14 @@ from tradingagents.graph.trading_graph import TradingAgentsGraph
 from tradingagents.default_config import DEFAULT_CONFIG
 
 config = DEFAULT_CONFIG.copy()
-config["llm_provider"] = "openai"        # openai, google, anthropic, xai, openrouter, ollama
-config["deep_think_llm"] = "gpt-5.4"     # Model for complex reasoning
-config["quick_think_llm"] = "gpt-5.4-mini" # Model for quick tasks
+config["llm_provider"] = "dashscope"        # openai, google, anthropic, xai, openrouter, dashscope, ollama
+config["deep_think_llm"] = "glm-5"          # Model for complex reasoning
+config["quick_think_llm"] = "glm-5"         # Model for quick tasks
 config["max_debate_rounds"] = 2
+config["output_language"] = "Chinese"
 
 ta = TradingAgentsGraph(debug=True, config=config)
-_, decision = ta.propagate("NVDA", "2026-01-15")
+_, decision = ta.propagate("688333.SH", "2026-01-15")
 print(decision)
 ```
 

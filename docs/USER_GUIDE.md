@@ -25,7 +25,7 @@ TradingAgents 是一个多代理交易框架，模拟真实交易公司的运作
 
 **核心特点：**
 - 支持 OpenAI、Anthropic、Google、xAI、DashScope 等多家 LLM 提供商
-- 默认使用 yfinance，无需额外 API Key 即可获取股票数据
+- 默认使用 Tushare citydata 代理获取 A 股股票数据
 - 多代理协作决策，降低单一模型偏差
 - 可配置的辩论和风险评估流程
 
@@ -64,13 +64,15 @@ cp .env.example .env
 编辑 `.env` 文件，填入你的 API Key：
 
 ```bash
-# 至少配置一个 LLM 提供商
+# 至少配置一个 LLM 提供商 + Tushare citydata 令牌
 OPENAI_API_KEY=sk-...           # OpenAI (GPT 系列)
 ANTHROPIC_API_KEY=sk-ant-...    # Anthropic (Claude 系列)
 GOOGLE_API_KEY=...              # Google (Gemini 系列)
 XAI_API_KEY=...                 # xAI (Grok 系列)
 OPENROUTER_API_KEY=sk-or-...    # OpenRouter (多模型)
 DASHSCOPE_API_KEY=sk-sp-...     # DashScope (通义千问/GLM)
+CITYDATA_TOKEN=...              # Tushare citydata 代理
+# 或 TUSHARE_TOKEN=...
 ```
 
 **推荐：** 国内用户可使用 DashScope（阿里云通义千问），无需翻墙。
@@ -86,7 +88,7 @@ python main.py
 ```
 
 CLI 模式会让你选择：
-- 股票代码（如 NVDA、AAPL、TSLA）
+- A 股股票代码（如 600519.SH、000001.SZ、688333.SH、688333.SS 或 600519）
 - 分析日期
 - LLM 提供商
 - 研究深度
@@ -129,6 +131,8 @@ config["output_language"] = "Chinese"       # 中文输出
 ta = TradingAgentsGraph(debug=True, config=config)
 ```
 
+默认情况下，`DEFAULT_CONFIG` 已经将 `data_vendors` 四个类别都切到 `tushare`。当前项目按 A 股模式运行，新闻、全球新闻和 insider 在 Tushare 模式下会返回稳定的占位提示文本，不会中断工作流。
+
 ### 高级配置
 
 | 配置项 | 默认值 | 说明 |
@@ -136,7 +140,7 @@ ta = TradingAgentsGraph(debug=True, config=config)
 | `max_debate_rounds` | 1 | 多空辩论轮数，0 表示跳过辩论环节 |
 | `max_risk_discuss_rounds` | 1 | 风险讨论轮数，0 表示跳过风险评估 |
 | `output_language` | English | 报告输出语言 |
-| `data_vendors` | yfinance | 数据源，可选 alpha_vantage |
+| `data_vendors` | tushare | 默认 A 股数据源，走 citydata 代理 |
 
 ---
 
@@ -149,7 +153,7 @@ tradingagents
 ```
 
 按提示选择：
-1. **股票代码** - 输入如 NVDA、AAPL
+1. **股票代码** - 输入如 600519.SH、000001.SZ、688333.SH、688333.SS 或 600519
 2. **分析日期** - 选择历史日期进行回测
 3. **LLM 提供商** - 选择已配置 API Key 的提供商
 4. **研究深度** - Quick（快）或 Deep（深度）
@@ -166,7 +170,7 @@ from dotenv import load_dotenv
 load_dotenv()  # 加载 .env 中的 API Key
 
 ta = TradingAgentsGraph(debug=True, config=DEFAULT_CONFIG.copy())
-_, decision = ta.propagate("NVDA", "2024-05-10")
+_, decision = ta.propagate("600519.SH", "2024-05-10")
 print(decision)  # 输出: BUY / HOLD / SELL
 ```
 
@@ -179,7 +183,7 @@ config["max_debate_rounds"] = 0           # 跳过辩论
 config["max_risk_discuss_rounds"] = 0     # 跳过风险评估
 
 ta = TradingAgentsGraph(debug=True, config=config)
-_, decision = ta.propagate("NVDA", "2024-05-10")
+_, decision = ta.propagate("688333.SH", "2024-05-10")
 ```
 
 **完整配置示例：**
@@ -192,15 +196,15 @@ from dotenv import load_dotenv
 load_dotenv()
 
 config = DEFAULT_CONFIG.copy()
-config["llm_provider"] = "openai"
-config["deep_think_llm"] = "gpt-5.4-mini"
-config["quick_think_llm"] = "gpt-5.4-mini"
+config["llm_provider"] = "dashscope"
+config["deep_think_llm"] = "glm-5"
+config["quick_think_llm"] = "glm-5"
 config["max_debate_rounds"] = 2
 config["max_risk_discuss_rounds"] = 1
 config["output_language"] = "Chinese"
 
 ta = TradingAgentsGraph(debug=True, config=config)
-_, decision = ta.propagate("AAPL", "2024-06-01")
+_, decision = ta.propagate("000001.SZ", "2024-06-01")
 print(decision)
 ```
 
@@ -322,10 +326,10 @@ load_dotenv()
 
 ### Q: 数据获取失败？
 
-默认使用 yfinance 获取数据：
-- 美股、港股、A股 主要股票均支持
-- 无需额外 API Key
-- 如需更多数据，可配置 Alpha Vantage
+默认使用 Tushare citydata 代理获取 A 股数据：
+- 需要 `CITYDATA_TOKEN` 或 `TUSHARE_TOKEN`
+- 当前项目默认只支持上交所/深交所 A 股代码
+- 新闻、全球新闻、内部交易在 Tushare 模式下为占位提示，不是实时新闻源
 
 ### Q: 分析时间太长？
 
