@@ -2,7 +2,7 @@
 
 > Multi-Agents LLM Financial Trading Framework - 多代理 LLM 金融交易框架
 
-**文档：** [使用说明](docs/USER_GUIDE.md) | [README](README.md)
+**文档：** [快速使用说明](docs/usage.md) | [完整使用说明](docs/USER_GUIDE.md) | [README](README.md)
 
 ## Project Overview
 

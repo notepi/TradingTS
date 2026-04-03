@@ -73,6 +73,7 @@ def get_Tushare_data_online(
         df = df.sort_values("trade_date")
 
         # 重命名列以匹配 yfinance 格式
+        # 注意：Tushare vol 单位是"手"(每手100股)，不是股数
         df = df.rename(columns={
             "trade_date": "Date",
             "open": "Open",
@@ -95,7 +96,8 @@ def get_Tushare_data_online(
         header = f"# Stock data for {normalized_symbol} from {start_date} to {end_date}\n"
         header += f"# Total records: {len(df)}\n"
         header += f"# Data retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-        header += f"# Data source: Tushare (citydata.club proxy)\n\n"
+        header += f"# Data source: Tushare (citydata.club proxy)\n"
+        header += f"# 注意：Volume 单位为手(每手100股)，Amount 单位为千元\n\n"
 
         return header + csv_string
 
@@ -161,7 +163,7 @@ def get_stock_stats_indicators_window(
             "high": "High",
             "low": "Low",
             "close": "Close",
-            "vol": "Volume"
+            "vol": "Volume"  # Tushare vol 单位是手(每手100股)
         })
         df["Date"] = pd.to_datetime(df["Date"])
 
@@ -191,6 +193,7 @@ def get_stock_stats_indicators_window(
             + "\n".join(result_lines)
             + "\n\n"
             + best_ind_params.get(indicator, "No description available.")
+            + "\n\n注意：Volume 单位为手(每手100股)，涉及成交量的指标(VWMA/MFI)需注意单位换算。"
         )
 
         return result_str
@@ -217,6 +220,12 @@ def get_fundamentals(
         # 获取财务指标
         indicator = pro.fina_indicator(ts_code=ts_code)
 
+        # 获取利润表
+        income = pro.income(ts_code=ts_code)
+
+        # 获取现金流量表
+        cashflow = pro.cashflow(ts_code=ts_code)
+
         if basic.empty:
             return f"No fundamentals data found for symbol '{ticker}'"
 
@@ -232,15 +241,33 @@ def get_fundamentals(
 
         if not indicator.empty:
             latest = indicator.iloc[0]
-            lines.append(f"ROE: {latest.get('roe', 'N/A')}")
-            lines.append(f"Net Profit Margin: {latest.get('netprofit_margin', 'N/A')}")
-            lines.append(f"Gross Profit Margin: {latest.get('grossprofit_margin', 'N/A')}")
-            lines.append(f"Debt to Asset Ratio: {latest.get('debt_to_assets', 'N/A')}")
+            lines.append(f"ROE (%): {latest.get('roe', 'N/A')}")
+            lines.append(f"Net Profit Margin (%): {latest.get('netprofit_margin', 'N/A')}")
+            lines.append(f"Gross Profit Margin (%): {latest.get('grossprofit_margin', 'N/A')}")
+            lines.append(f"Debt to Asset Ratio (%): {latest.get('debt_to_assets', 'N/A')}")
             lines.append(f"Current Ratio: {latest.get('current_ratio', 'N/A')}")
+
+        # 添加收入和利润数据（单位：亿元）
+        if not income.empty:
+            inc = income.iloc[0]
+            revenue = inc.get('revenue', 0)
+            n_income = inc.get('n_income', 0)
+            if revenue:
+                lines.append(f"Revenue (亿元): {float(revenue) / 1e8:.2f}")
+            if n_income:
+                lines.append(f"Net Income (亿元): {float(n_income) / 1e8:.2f}")
+
+        # 添加现金流数据（单位：亿元）
+        if not cashflow.empty:
+            cf = cashflow.iloc[0]
+            ocf = cf.get('n_cashflow_act', 0)
+            if ocf:
+                lines.append(f"Operating Cash Flow (亿元): {float(ocf) / 1e8:.2f}")
 
         header = f"# Company Fundamentals for {normalized_ticker}\n"
         header += f"# Data retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-        header += f"# Data source: Tushare (citydata.club proxy)\n\n"
+        header += f"# Data source: Tushare (citydata.club proxy)\n"
+        header += f"# 注意：金额单位已转换为亿元，比率单位为%\n\n"
 
         return header + "\n".join(lines)
 
@@ -276,7 +303,8 @@ def get_balance_sheet(
 
         header = f"# Balance Sheet data for {normalized_ticker} ({freq})\n"
         header += f"# Data retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-        header += f"# Data source: Tushare (citydata.club proxy)\n\n"
+        header += f"# Data source: Tushare (citydata.club proxy)\n"
+        header += f"# 注意：金额单位为元，如需亿元请除以1e8\n\n"
 
         return header + csv_string
 
@@ -311,7 +339,8 @@ def get_cashflow(
 
         header = f"# Cash Flow data for {normalized_ticker} ({freq})\n"
         header += f"# Data retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-        header += f"# Data source: Tushare (citydata.club proxy)\n\n"
+        header += f"# Data source: Tushare (citydata.club proxy)\n"
+        header += f"# 注意：金额单位为元，如需亿元请除以1e8\n\n"
 
         return header + csv_string
 
@@ -346,7 +375,8 @@ def get_income_statement(
 
         header = f"# Income Statement data for {normalized_ticker} ({freq})\n"
         header += f"# Data retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-        header += f"# Data source: Tushare (citydata.club proxy)\n\n"
+        header += f"# Data source: Tushare (citydata.club proxy)\n"
+        header += f"# 注意：金额单位为元，如需亿元请除以1e8\n\n"
 
         return header + csv_string
 

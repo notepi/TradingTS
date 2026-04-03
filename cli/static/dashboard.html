@@ -1,0 +1,1937 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TradingAgents Dashboard</title>
+  <style>
+    :root {
+      --bg: #f6f1e8;
+      --surface: rgba(255, 252, 245, 0.88);
+      --surface-strong: #fffaf1;
+      --ink: #1d2a24;
+      --muted: #5f6e63;
+      --accent: #0f766e;
+      --accent-soft: #d6efe8;
+      --warning: #b45309;
+      --danger: #b42318;
+      --success: #197a48;
+      --border: rgba(29, 42, 36, 0.12);
+      --shadow: 0 18px 50px rgba(41, 53, 45, 0.12);
+      --radius: 22px;
+      --mono: "SFMono-Regular", "JetBrains Mono", "Menlo", monospace;
+      --sans: "Avenir Next", "PingFang SC", "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: var(--sans);
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(15, 118, 110, 0.16), transparent 28%),
+        radial-gradient(circle at top right, rgba(180, 83, 9, 0.14), transparent 24%),
+        linear-gradient(180deg, #fbf7ef 0%, #f3ede2 100%);
+      min-height: 100vh;
+    }
+
+    .shell {
+      width: min(1500px, calc(100vw - 30px));
+      margin: 18px auto 34px;
+      display: grid;
+      grid-template-columns: 360px minmax(0, 1fr);
+      gap: 20px;
+    }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+    }
+
+    .sidebar {
+      padding: 24px;
+      position: sticky;
+      top: 18px;
+      align-self: start;
+    }
+
+    h1, h2, h3, h4 {
+      margin: 0;
+      letter-spacing: -0.02em;
+    }
+
+    .hero {
+      padding: 28px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      inset: auto -48px -72px auto;
+      width: 210px;
+      height: 210px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(15, 118, 110, 0.2), transparent 72%);
+    }
+
+    .hero h1 {
+      font-size: 32px;
+      margin-bottom: 10px;
+    }
+
+    .hero p, .muted, .meta {
+      color: var(--muted);
+    }
+
+    .status-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 13px;
+      font-weight: 700;
+      background: rgba(255, 255, 255, 0.7);
+      border: 1px solid rgba(29, 42, 36, 0.08);
+    }
+
+    .pill.pending, .agent-pill.pending { color: #6b7280; }
+    .pill.in_progress, .agent-pill.in_progress { color: var(--warning); }
+    .pill.completed, .agent-pill.completed { color: var(--success); }
+    .pill.error, .agent-pill.error { color: var(--danger); }
+    .pill.running { color: var(--warning); }
+    .pill.idle { color: #6b7280; }
+    .pill.current-focus {
+      background: linear-gradient(135deg, rgba(15, 118, 110, 0.18), rgba(180, 83, 9, 0.16));
+      border-color: rgba(15, 118, 110, 0.28);
+      box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.08);
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+    }
+
+    .field { margin-bottom: 16px; }
+
+    input, select {
+      width: 100%;
+      border: 1px solid rgba(29, 42, 36, 0.14);
+      background: #fffdf7;
+      border-radius: 14px;
+      padding: 12px 14px;
+      font: inherit;
+      color: var(--ink);
+    }
+
+    input:focus, select:focus {
+      outline: none;
+      border-color: rgba(15, 118, 110, 0.55);
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .checks {
+      display: grid;
+      gap: 10px;
+    }
+
+    .check {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.8);
+      border: 1px solid rgba(29, 42, 36, 0.08);
+    }
+
+    .check input {
+      width: auto;
+      margin: 0;
+    }
+
+    .actions {
+      display: flex;
+      gap: 12px;
+      margin-top: 18px;
+    }
+
+    button {
+      border: none;
+      cursor: pointer;
+      border-radius: 14px;
+      padding: 13px 16px;
+      font: inherit;
+      font-weight: 700;
+      transition: transform 0.2s ease, opacity 0.2s ease;
+    }
+
+    button:hover { transform: translateY(-1px); }
+    button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    .primary {
+      flex: 1;
+      background: linear-gradient(135deg, #0f766e 0%, #115e59 100%);
+      color: white;
+    }
+
+    .secondary {
+      background: rgba(255, 255, 255, 0.86);
+      color: var(--ink);
+      border: 1px solid rgba(29, 42, 36, 0.12);
+    }
+
+    .content {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .stat-card, .section-card, .stage-overview-card {
+      padding: 20px;
+    }
+
+    .stat-value {
+      font-size: 28px;
+      font-weight: 800;
+      margin-top: 8px;
+    }
+
+    .overview-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .stage-overview-card {
+      min-height: 156px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(255, 252, 245, 0.8));
+    }
+
+    .stage-overview-card.current-stage {
+      border-color: rgba(15, 118, 110, 0.36);
+      box-shadow: 0 18px 50px rgba(15, 118, 110, 0.14);
+      background: linear-gradient(180deg, rgba(228, 248, 243, 0.94), rgba(255, 252, 245, 0.84));
+    }
+
+    .stage-overview-card h3 {
+      font-size: 17px;
+      margin-bottom: 10px;
+    }
+
+    .stage-overview-card .muted {
+      font-size: 13px;
+    }
+
+    .stage-agent-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 18px;
+    }
+
+    .stage-agent-card {
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.82);
+      border: 1px solid rgba(29, 42, 36, 0.08);
+      padding: 14px;
+      min-height: 132px;
+    }
+
+    .stage-agent-card.current-agent {
+      border-color: rgba(217, 119, 6, 0.28);
+      background: linear-gradient(180deg, rgba(255, 244, 224, 0.92), rgba(255, 252, 245, 0.88));
+      box-shadow: 0 10px 28px rgba(217, 119, 6, 0.12);
+    }
+
+    .stage-agent-card h4 {
+      font-size: 16px;
+      line-height: 1.2;
+    }
+
+    .stage-agent-preview {
+      margin-top: 10px;
+      max-height: 150px;
+      overflow: auto;
+    }
+
+    .stage-agent-stream {
+      display: grid;
+      gap: 10px;
+    }
+
+    .stage-agent-entry {
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.84);
+      border: 1px solid rgba(29, 42, 36, 0.08);
+      padding: 10px;
+    }
+
+    .stage-agent-entry.latest {
+      border-color: rgba(15, 118, 110, 0.18);
+      background: linear-gradient(180deg, rgba(228, 248, 243, 0.72), rgba(255, 255, 255, 0.9));
+    }
+
+    .stage-agent-entry-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+    }
+
+    .stage-agent-entry pre {
+      font-size: 11px;
+      line-height: 1.55;
+    }
+
+    .stage-agent-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .progress-track {
+      height: 10px;
+      border-radius: 999px;
+      background: rgba(29, 42, 36, 0.08);
+      overflow: hidden;
+      margin-top: 14px;
+    }
+
+    .progress-fill {
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #0f766e, #d97706);
+      transition: width 0.3s ease;
+    }
+
+    .current-grid {
+      display: grid;
+      grid-template-columns: 0.9fr 1.1fr;
+      gap: 20px;
+    }
+
+    .path-box, .report-box {
+      margin-top: 16px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.78);
+      border: 1px solid rgba(29, 42, 36, 0.08);
+      padding: 16px;
+    }
+
+    .report-box.large {
+      max-height: 500px;
+      overflow: auto;
+    }
+
+    .current-speech-card {
+      border-radius: 18px;
+      background: linear-gradient(135deg, rgba(255, 244, 224, 0.78), rgba(228, 248, 243, 0.82));
+      border: 1px solid rgba(217, 119, 6, 0.18);
+      padding: 16px;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.3);
+    }
+
+    .current-speech-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+
+    .current-speech-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .fold-stack {
+      display: grid;
+      gap: 14px;
+      margin-top: 16px;
+    }
+
+    details.fold-section {
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.74);
+      border: 1px solid rgba(29, 42, 36, 0.08);
+      overflow: hidden;
+    }
+
+    details.fold-section[open] {
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+    }
+
+    .fold-summary {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 16px 18px;
+    }
+
+    .fold-summary-main {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 0;
+    }
+
+    .fold-body {
+      padding: 0 18px 18px;
+    }
+
+    .timeline-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    details.timeline-entry {
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.84);
+      border: 1px solid rgba(29, 42, 36, 0.08);
+      overflow: hidden;
+    }
+
+    details.timeline-entry.latest {
+      border-color: rgba(15, 118, 110, 0.2);
+      box-shadow: 0 12px 30px rgba(15, 118, 110, 0.08);
+    }
+
+    .timeline-summary {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 14px 16px;
+    }
+
+    .timeline-main {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .timeline-title {
+      font-size: 15px;
+      font-weight: 800;
+    }
+
+    .timeline-badges {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .timeline-body {
+      padding: 0 16px 16px;
+    }
+
+    .timeline-content {
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.8);
+      border: 1px solid rgba(29, 42, 36, 0.08);
+      padding: 14px;
+    }
+
+    .result-summary {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .summary-chip {
+      border-radius: 999px;
+      padding: 8px 12px;
+      background: rgba(214, 239, 232, 0.44);
+      border: 1px solid rgba(15, 118, 110, 0.08);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .decision {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 18px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, rgba(15, 118, 110, 0.12), rgba(180, 83, 9, 0.12));
+      margin-top: 16px;
+      font-size: 18px;
+      font-weight: 800;
+    }
+
+    .process-shell {
+      padding: 22px;
+    }
+
+    .process-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .process-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .filter-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .filter-chip {
+      border-radius: 999px;
+      border: 1px solid rgba(29, 42, 36, 0.1);
+      background: rgba(255, 255, 255, 0.76);
+      color: var(--muted);
+      padding: 8px 12px;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+    }
+
+    .filter-chip.active {
+      background: linear-gradient(135deg, rgba(15, 118, 110, 0.16), rgba(180, 83, 9, 0.12));
+      border-color: rgba(15, 118, 110, 0.22);
+      color: var(--ink);
+    }
+
+    details.stage,
+    details.agent,
+    details.event {
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.82);
+      border: 1px solid rgba(29, 42, 36, 0.08);
+    }
+
+    details.stage {
+      margin-bottom: 14px;
+      padding: 6px 14px 14px;
+    }
+
+    details.stage.current-stage {
+      border-color: rgba(15, 118, 110, 0.3);
+      background: linear-gradient(180deg, rgba(228, 248, 243, 0.8), rgba(255, 255, 255, 0.84));
+      box-shadow: inset 0 0 0 1px rgba(15, 118, 110, 0.08);
+    }
+
+    details.agent {
+      margin-top: 12px;
+      padding: 6px 14px 14px;
+      background: rgba(247, 244, 235, 0.9);
+    }
+
+    details.agent.current-agent {
+      border-color: rgba(217, 119, 6, 0.28);
+      background: linear-gradient(180deg, rgba(255, 244, 224, 0.88), rgba(255, 252, 245, 0.9));
+      box-shadow: inset 0 0 0 1px rgba(217, 119, 6, 0.08);
+    }
+
+    details.event {
+      margin-top: 10px;
+      padding: 4px 12px 12px;
+    }
+
+    summary {
+      list-style: none;
+      cursor: pointer;
+    }
+
+    summary::-webkit-details-marker { display: none; }
+
+    .stage-summary,
+    .agent-summary,
+    .event-summary {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 0;
+    }
+
+    .stage-left,
+    .agent-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .stage-number {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-weight: 800;
+      flex: none;
+    }
+
+    .agent-pill {
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 12px;
+      font-weight: 800;
+      background: rgba(255, 255, 255, 0.8);
+      border: 1px solid rgba(29, 42, 36, 0.08);
+      flex: none;
+    }
+
+    .agent-current-tag {
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      color: var(--warning);
+      background: rgba(217, 119, 6, 0.12);
+      border: 1px solid rgba(217, 119, 6, 0.16);
+      text-transform: uppercase;
+    }
+
+    .stage-metrics {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .event-list {
+      display: grid;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .event-type {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+    }
+
+    .event-type.report { color: var(--accent); }
+    .event-type.tool { color: var(--warning); }
+    .event-type.message { color: #2563eb; }
+    .event-type.status { color: var(--muted); }
+
+    .event-meta {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    pre {
+      margin: 0;
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.65;
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: #20352d;
+    }
+
+    .event-body {
+      border-radius: 14px;
+      margin-top: 10px;
+      padding: 14px;
+      background: rgba(255, 255, 255, 0.78);
+      border: 1px solid rgba(29, 42, 36, 0.08);
+      max-height: 340px;
+      overflow: auto;
+    }
+
+    .empty {
+      color: var(--muted);
+      font-style: italic;
+    }
+
+    .error-box {
+      margin-top: 16px;
+      padding: 14px 16px;
+      border-radius: 16px;
+      background: rgba(180, 35, 24, 0.1);
+      border: 1px solid rgba(180, 35, 24, 0.16);
+      color: var(--danger);
+      font-weight: 700;
+    }
+
+    @media (max-width: 1280px) {
+      .shell,
+      .current-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar {
+        position: static;
+      }
+
+      .overview-grid,
+      .stats {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .stage-agent-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 760px) {
+      .shell {
+        width: min(100vw - 18px, 100%);
+        margin: 10px auto 24px;
+      }
+
+      .hero,
+      .sidebar,
+      .stat-card,
+      .stage-overview-card,
+      .section-card,
+      .process-shell {
+        padding: 16px;
+      }
+
+      .overview-grid,
+      .stats,
+      .grid-2 {
+        grid-template-columns: 1fr;
+      }
+
+      .stage-agent-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside class="panel sidebar">
+      <h2>启动分析</h2>
+      <div class="field">
+        <label for="ticker">A 股代码</label>
+        <input id="ticker" placeholder="600519.SH" />
+      </div>
+      <div class="grid-2">
+        <div class="field">
+          <label for="analysis-date">分析日期</label>
+          <input id="analysis-date" type="date" />
+        </div>
+        <div class="field">
+          <label for="research-depth">研究深度</label>
+          <select id="research-depth"></select>
+        </div>
+      </div>
+      <div class="field">
+        <label for="provider">LLM Provider</label>
+        <select id="provider"></select>
+      </div>
+      <div class="grid-2">
+        <div class="field">
+          <label for="quick-model">Quick Model</label>
+          <select id="quick-model"></select>
+        </div>
+        <div class="field">
+          <label for="deep-model">Deep Model</label>
+          <select id="deep-model"></select>
+        </div>
+      </div>
+      <div class="field">
+        <label for="output-language">输出语言</label>
+        <select id="output-language"></select>
+      </div>
+      <div class="grid-2">
+        <div class="field" id="google-thinking-field" style="display:none;">
+          <label for="google-thinking">Gemini Thinking</label>
+          <select id="google-thinking">
+            <option value="">Default</option>
+            <option value="high">High</option>
+            <option value="minimal">Minimal</option>
+          </select>
+        </div>
+        <div class="field" id="openai-effort-field" style="display:none;">
+          <label for="openai-effort">OpenAI Effort</label>
+          <select id="openai-effort">
+            <option value="">Default</option>
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+          </select>
+        </div>
+        <div class="field" id="anthropic-effort-field" style="display:none;">
+          <label for="anthropic-effort">Claude Effort</label>
+          <select id="anthropic-effort">
+            <option value="">Default</option>
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label>Analyst Team</label>
+        <div class="checks" id="analyst-list"></div>
+      </div>
+      <div class="actions">
+        <button class="primary" id="start-button">开始分析</button>
+        <button class="secondary" id="reset-button">重置</button>
+      </div>
+      <p class="muted" style="margin-top:14px;">
+        这个页面不改变原来的多代理执行链路，只把状态、过程和输出整合成可回溯的过程视图。
+      </p>
+    </aside>
+
+    <main class="content">
+      <section class="panel hero">
+        <h1>TradingAgents Workflow Dashboard</h1>
+        <p>上面看总进度，下面按“阶段 -> Agent -> 发言/工具/阶段结果”回溯整个过程。当前输出和最终汇总仍然保留。</p>
+        <div class="status-strip">
+          <span class="pill idle" id="run-status-pill">STATUS: IDLE</span>
+          <span class="pill" id="current-stage-pill">当前阶段: -</span>
+          <span class="pill" id="current-agent-pill">当前 Agent: -</span>
+          <span class="pill" id="elapsed-pill">耗时: --</span>
+          <span class="pill" id="result-path-pill">结果目录: --</span>
+        </div>
+        <div id="error-box"></div>
+      </section>
+
+      <section class="stats">
+        <div class="panel stat-card">
+          <div class="muted">LLM Calls</div>
+          <div class="stat-value" id="llm-calls">0</div>
+        </div>
+        <div class="panel stat-card">
+          <div class="muted">Tool Calls</div>
+          <div class="stat-value" id="tool-calls">0</div>
+        </div>
+        <div class="panel stat-card">
+          <div class="muted">Agents</div>
+          <div class="stat-value" id="agents-progress">0 / 0</div>
+        </div>
+        <div class="panel stat-card">
+          <div class="muted">Reports</div>
+          <div class="stat-value" id="reports-progress">0 / 0</div>
+        </div>
+        <div class="panel stat-card">
+          <div class="muted">Process Events</div>
+          <div class="stat-value" id="event-count">0</div>
+        </div>
+      </section>
+
+      <section class="overview-grid" id="workflow-overview"></section>
+
+      <section class="current-grid">
+        <div class="panel section-card">
+          <h2>当前输出</h2>
+          <div class="fold-stack">
+            <details class="fold-section" data-expand-key="fold-current-focus" data-default-open="true">
+              <summary>
+                <div class="fold-summary">
+                  <div class="fold-summary-main">
+                    <h3>当前发言</h3>
+                    <div class="muted">这里会直接显示当前 Agent 最新一条消息、工具调用或阶段输出。</div>
+                  </div>
+                  <div class="current-speech-meta">
+                    <span class="agent-current-tag" id="current-focus-agent">Agent: -</span>
+                    <span class="pill" id="current-focus-type">类型: -</span>
+                    <span class="pill" id="current-focus-time">时间: -</span>
+                  </div>
+                </div>
+              </summary>
+              <div class="fold-body">
+                <div class="current-speech-card">
+                  <pre id="current-focus-content" class="empty">当前还没有可展示的发言内容。</pre>
+                </div>
+              </div>
+            </details>
+
+            <details class="fold-section" data-expand-key="fold-current-timeline" data-default-open="true">
+              <summary>
+                <div class="fold-summary">
+                  <div class="fold-summary-main">
+                    <h3>发言时间线</h3>
+                    <div class="muted">按时间倒序展示角色发言、工具调用和阶段输出，最新内容在最上面，每条都可手动折叠。</div>
+                  </div>
+                </div>
+              </summary>
+              <div class="fold-body">
+                <div class="timeline-list" id="speech-timeline">
+                  <div class="empty">等待角色开始发言...</div>
+                </div>
+              </div>
+            </details>
+
+            <details class="fold-section" data-expand-key="fold-current-report" data-default-open="false">
+              <summary>
+                <div class="fold-summary">
+                  <div class="fold-summary-main">
+                    <h3>最近报告片段</h3>
+                    <div class="muted">显示最近一段结构化报告片段。</div>
+                  </div>
+                </div>
+              </summary>
+              <div class="fold-body">
+                <div class="report-box">
+                  <pre id="current-report" class="empty">等待新的报告片段...</pre>
+                </div>
+              </div>
+            </details>
+
+            <details class="fold-section" data-expand-key="fold-current-decision" data-default-open="false">
+              <summary>
+                <div class="fold-summary">
+                  <div class="fold-summary-main">
+                    <h3>当前决策</h3>
+                    <div class="muted">最终评级和当前阶段提炼结果。</div>
+                  </div>
+                </div>
+              </summary>
+              <div class="fold-body">
+                <div id="decision-box"></div>
+              </div>
+            </details>
+          </div>
+        </div>
+
+        <div class="panel section-card">
+          <h2>完整结果</h2>
+          <div class="fold-stack">
+            <details class="fold-section" data-expand-key="fold-result-file" data-default-open="false">
+              <summary>
+                <div class="fold-summary">
+                  <div class="fold-summary-main">
+                    <h3>结果文件</h3>
+                    <div class="muted">完整报告文件路径和输出目录。</div>
+                  </div>
+                </div>
+              </summary>
+              <div class="fold-body">
+                <div class="path-box">
+                  <div class="meta">完整报告文件</div>
+                  <pre id="report-file">--</pre>
+                </div>
+              </div>
+            </details>
+
+            <details class="fold-section" data-expand-key="fold-result-summary" data-default-open="true">
+              <summary>
+                <div class="fold-summary">
+                  <div class="fold-summary-main">
+                    <h3>结果摘要</h3>
+                    <div class="muted">当前已产出的报告段落概览。</div>
+                  </div>
+                </div>
+              </summary>
+              <div class="fold-body">
+                <div class="result-summary" id="result-summary"></div>
+              </div>
+            </details>
+
+            <details class="fold-section" data-expand-key="fold-final-report" data-default-open="true">
+              <summary>
+                <div class="fold-summary">
+                  <div class="fold-summary-main">
+                    <h3>完整报告</h3>
+                    <div class="muted">分析完成后，这里会显示整合后的完整报告。</div>
+                  </div>
+                </div>
+              </summary>
+              <div class="fold-body">
+                <div class="report-box large">
+                  <pre id="final-report" class="empty">分析完成后，这里会显示整合后的完整报告。</pre>
+                </div>
+              </div>
+            </details>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel process-shell">
+        <div class="process-head">
+          <div>
+            <h2>全流程过程视图</h2>
+            <div class="muted">每个阶段可展开，每个 Agent 单独折叠，下面保留消息、工具调用和阶段报告。</div>
+          </div>
+          <div class="process-actions">
+            <div class="filter-bar" id="event-filters"></div>
+            <div class="pill" id="process-summary-pill">事件数: 0</div>
+          </div>
+        </div>
+        <div id="process-tree">
+          <div class="empty">还没有过程内容，启动分析后这里会逐步展开。</div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const expandedStorageKey = "tradingagents_dashboard_expanded";
+
+    const state = {
+      options: null,
+      snapshot: null,
+      pollingTimer: null,
+      eventFilter: "all",
+      actionPending: false,
+      formDirty: false,
+      lastSyncedSelectionSignature: null,
+      expanded: loadExpandedState(),
+    };
+
+    const eventFilterOptions = [
+      { value: "all", label: "全部" },
+      { value: "report", label: "只看 Report" },
+      { value: "tool", label: "只看 Tool" },
+      { value: "message", label: "只看 Message" },
+    ];
+
+    const workflowBlueprint = [
+      {
+        id: "analysts",
+        title: "Analyst Team",
+        roles: ["market", "social", "news", "fundamentals"],
+      },
+      {
+        id: "research",
+        title: "Research Team",
+        roles: ["Bull Researcher", "Bear Researcher", "Research Manager"],
+      },
+      {
+        id: "trading",
+        title: "Trading Team",
+        roles: ["Trader"],
+      },
+      {
+        id: "risk",
+        title: "Risk Management",
+        roles: ["Aggressive Analyst", "Neutral Analyst", "Conservative Analyst"],
+      },
+      {
+        id: "portfolio",
+        title: "Portfolio Management",
+        roles: ["Portfolio Manager"],
+      },
+    ];
+
+    const reportTitles = {
+      market_report: "Market Analysis",
+      sentiment_report: "Social Sentiment",
+      news_report: "News Analysis",
+      fundamentals_report: "Fundamentals Analysis",
+      investment_plan: "Research Team Decision",
+      trader_investment_plan: "Trading Team Plan",
+      final_trade_decision: "Portfolio Management Decision",
+    };
+
+    const analystNameMap = {
+      market: "Market Analyst",
+      social: "Social Analyst",
+      news: "News Analyst",
+      fundamentals: "Fundamentals Analyst",
+    };
+
+    function $(id) {
+      return document.getElementById(id);
+    }
+
+    function loadExpandedState() {
+      try {
+        const raw = window.sessionStorage.getItem(expandedStorageKey);
+        return raw ? JSON.parse(raw) : {};
+      } catch (_error) {
+        return {};
+      }
+    }
+
+    function saveExpandedState() {
+      try {
+        window.sessionStorage.setItem(
+          expandedStorageKey,
+          JSON.stringify(state.expanded)
+        );
+      } catch (_error) {
+        // Ignore storage failures and keep the in-memory copy.
+      }
+    }
+
+    function isExpanded(expandKey, defaultOpen = false) {
+      if (!expandKey) {
+        return defaultOpen;
+      }
+      if (Object.prototype.hasOwnProperty.call(state.expanded, expandKey)) {
+        return Boolean(state.expanded[expandKey]);
+      }
+      return defaultOpen;
+    }
+
+    function bindExpandableState(root = document) {
+      root.querySelectorAll("details[data-expand-key]").forEach((detail) => {
+        if (detail.dataset.expandBound === "true") {
+          return;
+        }
+        detail.dataset.expandBound = "true";
+        detail.addEventListener("toggle", () => {
+          state.expanded[detail.dataset.expandKey] = detail.open;
+          saveExpandedState();
+        });
+      });
+    }
+
+    function applyStaticExpandedState() {
+      document.querySelectorAll("details[data-expand-key]").forEach((detail) => {
+        if (detail.dataset.dynamicDetail === "true") {
+          return;
+        }
+        const expandKey = detail.dataset.expandKey;
+        const defaultOpen = detail.dataset.defaultOpen === "true";
+        detail.open = isExpanded(expandKey, defaultOpen);
+      });
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;");
+    }
+
+    async function fetchJSON(url, options = {}) {
+      const response = await fetch(url, {
+        headers: { "Content-Type": "application/json" },
+        ...options,
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error || "Request failed");
+      }
+      return payload;
+    }
+
+    function populateSelect(element, items, selectedValue) {
+      element.innerHTML = items
+        .map(
+          (item) =>
+            `<option value="${escapeHtml(item.value)}"${String(item.value) === String(selectedValue) ? " selected" : ""}>${escapeHtml(item.label)}</option>`
+        )
+        .join("");
+    }
+
+    function getFormControls() {
+      return [
+        $("ticker"),
+        $("analysis-date"),
+        $("research-depth"),
+        $("provider"),
+        $("quick-model"),
+        $("deep-model"),
+        $("output-language"),
+        $("google-thinking"),
+        $("openai-effort"),
+        $("anthropic-effort"),
+        ...document.querySelectorAll('#analyst-list input[type="checkbox"]'),
+      ].filter(Boolean);
+    }
+
+    function setFormDisabled(disabled) {
+      getFormControls().forEach((control) => {
+        control.disabled = disabled;
+      });
+    }
+
+    function bindFormDraftState() {
+      getFormControls().forEach((control) => {
+        if (control.dataset.formDraftBound === "true") {
+          return;
+        }
+        control.dataset.formDraftBound = "true";
+
+        const markDirty = () => {
+          if (!control.disabled) {
+            state.formDirty = true;
+          }
+        };
+
+        control.addEventListener("input", markDirty);
+        control.addEventListener("change", markDirty);
+      });
+    }
+
+    function getSelectionSignature(selections) {
+      if (!selections) {
+        return null;
+      }
+      return JSON.stringify({
+        ...selections,
+        analysts: [...(selections.analysts || [])].sort(),
+      });
+    }
+
+    function renderOptions(options) {
+      state.options = options;
+
+      populateSelect(
+        $("research-depth"),
+        options.research_depths.map((item) => ({
+          value: item.value,
+          label: `${item.label} (${item.value})`,
+        })),
+        String(options.defaults.research_depth)
+      );
+
+      populateSelect(
+        $("provider"),
+        options.providers.map((provider) => ({
+          value: provider,
+          label: provider,
+        })),
+        options.defaults.llm_provider
+      );
+
+      populateSelect(
+        $("output-language"),
+        options.languages.map((language) => ({
+          value: language,
+          label: language,
+        })),
+        options.defaults.output_language
+      );
+
+      $("ticker").value = options.defaults.ticker;
+      $("analysis-date").value = options.defaults.analysis_date;
+      $("google-thinking").value = options.defaults.google_thinking_level || "";
+      $("openai-effort").value = options.defaults.openai_reasoning_effort || "";
+      $("anthropic-effort").value = options.defaults.anthropic_effort || "";
+
+      const analystList = $("analyst-list");
+      analystList.innerHTML = "";
+      for (const analyst of options.analysts) {
+        const wrapper = document.createElement("label");
+        wrapper.className = "check";
+        wrapper.innerHTML = `
+          <input type="checkbox" value="${escapeHtml(analyst.value)}" />
+          <span>${escapeHtml(analyst.label)}</span>
+        `;
+        const input = wrapper.querySelector("input");
+        input.checked = options.defaults.analysts.includes(analyst.value);
+        analystList.appendChild(wrapper);
+      }
+
+      updateModelSelects();
+      updateProviderFields();
+      bindFormDraftState();
+      setFormDisabled(false);
+      state.formDirty = false;
+      state.lastSyncedSelectionSignature = null;
+    }
+
+    function updateModelSelects() {
+      const provider = $("provider").value;
+      const providerOptions = state.options.models[provider];
+      const quickFallback =
+        state.snapshot?.selections?.quick_think_llm || state.options.defaults.quick_think_llm;
+      const deepFallback =
+        state.snapshot?.selections?.deep_think_llm || state.options.defaults.deep_think_llm;
+
+      populateSelect(
+        $("quick-model"),
+        providerOptions.quick.map(([label, value]) => ({ value, label })),
+        quickFallback
+      );
+      populateSelect(
+        $("deep-model"),
+        providerOptions.deep.map(([label, value]) => ({ value, label })),
+        deepFallback
+      );
+    }
+
+    function updateProviderFields() {
+      const provider = $("provider").value;
+      $("google-thinking-field").style.display = provider === "google" ? "block" : "none";
+      $("openai-effort-field").style.display = provider === "openai" ? "block" : "none";
+      $("anthropic-effort-field").style.display = provider === "anthropic" ? "block" : "none";
+    }
+
+    function getSelectedAnalysts() {
+      return [...document.querySelectorAll('#analyst-list input[type="checkbox"]')]
+        .filter((input) => input.checked)
+        .map((input) => input.value);
+    }
+
+    function setActionPending(pending) {
+      state.actionPending = pending;
+      updateActionButtons(state.snapshot);
+    }
+
+    function updateActionButtons(snapshot) {
+      const primaryButton = $("start-button");
+      const resetButton = $("reset-button");
+      const status = snapshot?.status || "idle";
+
+      if (status === "running") {
+        primaryButton.textContent = "停止分析";
+        primaryButton.className = "secondary";
+        primaryButton.disabled = state.actionPending;
+        resetButton.disabled = true;
+        return;
+      }
+
+      if (status === "stopping") {
+        primaryButton.textContent = "停止中...";
+        primaryButton.className = "secondary";
+        primaryButton.disabled = true;
+        resetButton.disabled = true;
+        return;
+      }
+
+      primaryButton.textContent = "开始分析";
+      primaryButton.className = "primary";
+      primaryButton.disabled = state.actionPending;
+      resetButton.disabled = state.actionPending;
+    }
+
+    async function startAnalysis() {
+      const payload = {
+        ticker: $("ticker").value.trim(),
+        analysis_date: $("analysis-date").value,
+        research_depth: Number($("research-depth").value),
+        llm_provider: $("provider").value,
+        quick_think_llm: $("quick-model").value,
+        deep_think_llm: $("deep-model").value,
+        output_language: $("output-language").value,
+        analysts: getSelectedAnalysts(),
+      };
+
+      if ($("provider").value === "google") {
+        payload.google_thinking_level = $("google-thinking").value;
+      }
+      if ($("provider").value === "openai") {
+        payload.openai_reasoning_effort = $("openai-effort").value;
+      }
+      if ($("provider").value === "anthropic") {
+        payload.anthropic_effort = $("anthropic-effort").value;
+      }
+
+      setActionPending(true);
+      try {
+        const snapshot = await fetchJSON("/api/start", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+        state.snapshot = snapshot;
+        syncFormWithSelections(snapshot.selections, { force: true });
+        renderSnapshot(snapshot);
+      } catch (error) {
+        alert(error.message);
+      } finally {
+        setActionPending(false);
+      }
+    }
+
+    async function stopAnalysis() {
+      setActionPending(true);
+      try {
+        const snapshot = await fetchJSON("/api/stop", {
+          method: "POST",
+          body: JSON.stringify({}),
+        });
+        state.snapshot = snapshot;
+        renderSnapshot(snapshot);
+      } catch (error) {
+        alert(error.message);
+      } finally {
+        setActionPending(false);
+      }
+    }
+
+    async function resetDashboard() {
+      setActionPending(true);
+      try {
+        const snapshot = await fetchJSON("/api/reset", {
+          method: "POST",
+          body: JSON.stringify({}),
+        });
+        state.snapshot = snapshot;
+        renderSnapshot(snapshot);
+      } catch (error) {
+        alert(error.message);
+      } finally {
+        setActionPending(false);
+      }
+    }
+
+    function handlePrimaryAction() {
+      const status = state.snapshot?.status || "idle";
+      if (status === "running") {
+        stopAnalysis();
+        return;
+      }
+      if (status === "stopping") {
+        return;
+      }
+      startAnalysis();
+    }
+
+    function syncFormWithSelections(selections, { force = false } = {}) {
+      if (!selections) {
+        return;
+      }
+
+      const signature = getSelectionSignature(selections);
+      if (!force && state.formDirty) {
+        return;
+      }
+      if (!force && signature && state.lastSyncedSelectionSignature === signature) {
+        return;
+      }
+
+      $("ticker").value = selections.ticker;
+      $("analysis-date").value = selections.analysis_date;
+      $("research-depth").value = String(selections.research_depth);
+      $("provider").value = selections.llm_provider;
+      updateModelSelects();
+      updateProviderFields();
+      $("quick-model").value = selections.quick_think_llm;
+      $("deep-model").value = selections.deep_think_llm;
+      $("output-language").value = selections.output_language;
+      $("google-thinking").value = selections.google_thinking_level || "";
+      $("openai-effort").value = selections.openai_reasoning_effort || "";
+      $("anthropic-effort").value = selections.anthropic_effort || "";
+
+      const selectedAnalysts = new Set(selections.analysts || []);
+      for (const input of document.querySelectorAll('#analyst-list input[type="checkbox"]')) {
+        input.checked = selectedAnalysts.has(input.value);
+      }
+
+      state.formDirty = false;
+      state.lastSyncedSelectionSignature = signature;
+    }
+
+    function renderEventFilters() {
+      const container = $("event-filters");
+      container.innerHTML = eventFilterOptions
+        .map(
+          (item) => `
+            <button
+              type="button"
+              class="filter-chip ${state.eventFilter === item.value ? "active" : ""}"
+              data-filter="${escapeHtml(item.value)}"
+            >
+              ${escapeHtml(item.label)}
+            </button>
+          `
+        )
+        .join("");
+
+      container.querySelectorAll("[data-filter]").forEach((button) => {
+        button.addEventListener("click", () => {
+          state.eventFilter = button.dataset.filter;
+          renderEventFilters();
+          if (state.snapshot) {
+            renderProcessTree(state.snapshot.process_tree, state.snapshot);
+          }
+        });
+      });
+    }
+
+    function formatStageName(workflow) {
+      const activeStage =
+        workflow.find((stage) => stage.status === "in_progress") ||
+        workflow.find((stage) => stage.status === "pending") ||
+        workflow[workflow.length - 1];
+      return activeStage ? activeStage.title : "-";
+    }
+
+    function getSelectedAnalystKeys(snapshot) {
+      if (snapshot?.selections?.analysts?.length) {
+        return snapshot.selections.analysts;
+      }
+      if (state.options?.defaults?.analysts?.length) {
+        return state.options.defaults.analysts;
+      }
+      return ["market", "social", "news", "fundamentals"];
+    }
+
+    function buildWorkflowOverviewModel(snapshot) {
+      const selectedAnalysts = new Set(getSelectedAnalystKeys(snapshot));
+      const stageStateMap = new Map((snapshot.workflow || []).map((stage) => [stage.id, stage]));
+      const processStageMap = new Map((snapshot.process_tree || []).map((stage) => [stage.id, stage]));
+
+      return workflowBlueprint.map((stage, index) => {
+        const visibleRoles = stage.roles
+          .filter((role) => stage.id !== "analysts" || selectedAnalysts.has(role))
+          .map((role) => {
+            const roleName = analystNameMap[role] || role;
+            const processStage = processStageMap.get(stage.id);
+            const processAgent = processStage?.agents?.find((agent) => agent.name === roleName);
+            const latestReadableEvent =
+              [...(processAgent?.events || [])]
+                .reverse()
+                .find((event) => ["message", "tool", "report"].includes(event.type)) ||
+              [...(processAgent?.events || [])].reverse()[0] ||
+              null;
+
+            return {
+              key: role,
+              name: roleName,
+              status: snapshot.agent_status?.[roleName] || processAgent?.status || "pending",
+              latestReadableEvent,
+            };
+          });
+
+        const runtimeStage = stageStateMap.get(stage.id);
+        const totalAgents = visibleRoles.length;
+        const completedAgents = visibleRoles.filter((role) => role.status === "completed").length;
+        const stageStatus =
+          runtimeStage?.status ||
+          (visibleRoles.some((role) => role.status === "in_progress")
+            ? "in_progress"
+            : completedAgents === totalAgents && totalAgents > 0
+            ? "completed"
+            : "pending");
+
+        return {
+          id: stage.id,
+          title: stage.title,
+          order: index + 1,
+          roles: visibleRoles,
+          totalAgents,
+          completedAgents,
+          status: stageStatus,
+        };
+      });
+    }
+
+    function getTeamTitleByStageId(stageId) {
+      const stage = workflowBlueprint.find((item) => item.id === stageId);
+      return stage ? stage.title : "Run Setup";
+    }
+
+    function renderWorkflowOverview(snapshot) {
+      const container = $("workflow-overview");
+      const workflowModel = buildWorkflowOverviewModel(snapshot);
+      if (!workflowModel.length) {
+        container.innerHTML = "";
+        return;
+      }
+
+      container.innerHTML = workflowModel
+        .map((stage) => {
+          const progress = stage.totalAgents
+            ? Math.round((stage.completedAgents / stage.totalAgents) * 100)
+            : 0;
+          const isCurrentStage = snapshot.current_stage_id && snapshot.current_stage_id === stage.id;
+          return `
+            <section class="panel stage-overview-card${isCurrentStage ? " current-stage" : ""}">
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+                <span class="pill ${escapeHtml(stage.status)}">${escapeHtml(stage.status)}</span>
+                <span class="summary-chip">Step ${stage.order}</span>
+              </div>
+              <h3 style="margin-top:14px;">${escapeHtml(stage.title)}</h3>
+              <div class="muted">${stage.completedAgents} / ${stage.totalAgents} agents</div>
+              <div class="progress-track">
+                <div class="progress-fill" style="width:${progress}%"></div>
+              </div>
+              <div class="stage-agent-grid">
+                ${stage.roles
+                  .map((agent) => {
+                    const isCurrentAgent = snapshot.current_agent && snapshot.current_agent === agent.name;
+                    const recentReadableEvents = [...(agent.latestReadableEvent ? [agent.latestReadableEvent] : [])];
+                    const processStage = (snapshot.process_tree || []).find((item) => item.id === stage.id);
+                    const processAgent = processStage?.agents?.find((item) => item.name === agent.name);
+                    const eventStream = [...(processAgent?.events || [])]
+                      .filter((event) => ["message", "tool", "report"].includes(event.type))
+                      .reverse()
+                      .slice(0, 4);
+                    const visibleEvents = eventStream.length ? eventStream : recentReadableEvents;
+                    return `
+                      <div class="stage-agent-card${isCurrentAgent ? " current-agent" : ""}">
+                        <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:8px;">
+                          <div>
+                            <h4>${escapeHtml(agent.name)}</h4>
+                          </div>
+                          <div style="display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
+                            <span class="agent-pill ${escapeHtml(agent.status)}">${escapeHtml(agent.status)}</span>
+                            ${isCurrentAgent ? `<span class="agent-current-tag">当前发言</span>` : ""}
+                          </div>
+                        </div>
+                        <div class="stage-agent-preview">
+                          ${
+                            visibleEvents.length
+                              ? `<div class="stage-agent-stream">
+                                  ${visibleEvents
+                                    .map(
+                                      (event, eventIndex) => `
+                                        <div class="stage-agent-entry${eventIndex === 0 ? " latest" : ""}">
+                                          <div class="stage-agent-entry-meta">
+                                            <span class="event-type ${escapeHtml(event.type || "message")}">${escapeHtml(event.type || "message")}</span>
+                                            <span class="summary-chip">${escapeHtml(event.timestamp || "-")}</span>
+                                          </div>
+                                          <pre>${escapeHtml(event.content || "")}</pre>
+                                        </div>
+                                      `
+                                    )
+                                    .join("")}
+                                </div>`
+                              : `<pre class="empty">这个角色还没有可读内容。</pre>`
+                          }
+                        </div>
+                        <div class="stage-agent-meta">
+                          <span class="summary-chip">最近 ${visibleEvents.length || 0} 条</span>
+                          <span class="summary-chip">${escapeHtml(visibleEvents[0]?.timestamp || "-")}</span>
+                        </div>
+                      </div>
+                    `;
+                  })
+                  .join("")}
+              </div>
+            </section>
+          `;
+        })
+        .join("");
+    }
+
+    function matchesEventFilter(event) {
+      if (state.eventFilter === "all") {
+        return true;
+      }
+      return event.type === state.eventFilter;
+    }
+
+    function renderProcessTree(processTree, snapshot) {
+      const container = $("process-tree");
+      if (!processTree?.length) {
+        container.innerHTML = `<div class="empty">还没有过程内容，启动分析后这里会逐步展开。</div>`;
+        return;
+      }
+
+      const visibleStages = processTree
+        .map((stage) => {
+          const filteredAgents = stage.agents
+            .map((agent) => ({
+              ...agent,
+              filteredEvents: (agent.events || []).filter(matchesEventFilter),
+            }))
+            .filter((agent) =>
+              state.eventFilter === "all"
+                ? true
+                : agent.filteredEvents.length > 0 || agent.name === snapshot.current_agent
+            );
+          return { ...stage, filteredAgents };
+        })
+        .filter((stage) =>
+          state.eventFilter === "all"
+            ? true
+            : stage.filteredAgents.length > 0 || stage.id === snapshot.current_stage_id
+        );
+
+      if (!visibleStages.length) {
+        container.innerHTML = `<div class="empty">当前过滤条件下还没有可展示的事件。</div>`;
+        return;
+      }
+
+      container.innerHTML = visibleStages
+        .map((stage, index) => {
+          const stageOpen = stage.status === "in_progress" || stage.id === "setup";
+          const stageEvents = stage.filteredAgents.reduce(
+            (count, agent) => count + (agent.filteredEvents?.length || 0),
+            0
+          );
+          const isCurrentStage = snapshot.current_stage_id && snapshot.current_stage_id === stage.id;
+          return `
+            <details
+              class="stage${isCurrentStage ? " current-stage" : ""}"
+              data-expand-key="process-stage:${escapeHtml(stage.id)}"
+              data-dynamic-detail="true"
+              ${isExpanded(`process-stage:${stage.id}`, stageOpen) ? "open" : ""}
+            >
+              <summary>
+                <div class="stage-summary">
+                  <div class="stage-left">
+                    <span class="stage-number">${index + 1}</span>
+                    <div>
+                      <h3>${escapeHtml(stage.title)}</h3>
+                      <div class="muted">${stage.completed_agents} / ${stage.total_agents} agents · ${stageEvents} events</div>
+                    </div>
+                  </div>
+                  <div class="stage-metrics">
+                    <span class="pill ${escapeHtml(stage.status)}">${escapeHtml(stage.status)}</span>
+                  </div>
+                </div>
+              </summary>
+              ${stage.filteredAgents
+                .map((agent) => {
+                  const agentOpen = agent.status === "in_progress";
+                  const events = agent.filteredEvents || [];
+                  const isCurrentAgent = snapshot.current_agent && snapshot.current_agent === agent.name;
+                  return `
+                    <details
+                      class="agent${isCurrentAgent ? " current-agent" : ""}"
+                      data-expand-key="process-agent:${escapeHtml(stage.id)}:${escapeHtml(agent.name)}"
+                      data-dynamic-detail="true"
+                      ${isExpanded(`process-agent:${stage.id}:${agent.name}`, agentOpen || isCurrentAgent) ? "open" : ""}
+                    >
+                      <summary>
+                        <div class="agent-summary">
+                          <div class="agent-left">
+                            <h4>${escapeHtml(agent.name)}</h4>
+                            <span class="agent-pill ${escapeHtml(agent.status)}">${escapeHtml(agent.status)}</span>
+                            ${isCurrentAgent ? `<span class="agent-current-tag">当前发言</span>` : ""}
+                          </div>
+                          <div class="muted">${events.length} events</div>
+                        </div>
+                      </summary>
+                      ${
+                        events.length
+                          ? `<div class="event-list">
+                              ${events
+                                .map((event) => `
+                                  <details
+                                    class="event"
+                                    data-expand-key="process-event:${escapeHtml(String(event.id))}"
+                                    data-dynamic-detail="true"
+                                    ${
+                                      isExpanded(
+                                        `process-event:${event.id}`,
+                                        event.id === snapshot.current_focus_event?.id || event.type === "report"
+                                      )
+                                        ? "open"
+                                        : ""
+                                    }
+                                  >
+                                    <summary>
+                                      <div class="event-summary">
+                                        <div>
+                                          <div class="event-meta">
+                                            <span class="event-type ${escapeHtml(event.type)}">${escapeHtml(event.type)}</span>
+                                            <span class="muted">${escapeHtml(event.label)}</span>
+                                          </div>
+                                          <div class="muted" style="margin-top:4px;">${escapeHtml(event.timestamp)}</div>
+                                        </div>
+                                      </div>
+                                    </summary>
+                                    <div class="event-body">
+                                      <pre>${escapeHtml(event.content)}</pre>
+                                    </div>
+                                  </details>
+                                `)
+                                .join("")}
+                            </div>`
+                          : `<div class="empty" style="margin-top:10px;">这个 Agent 还没有事件。</div>`
+                      }
+                    </details>
+                  `;
+                })
+                .join("")}
+            </details>
+          `;
+        })
+        .join("");
+      bindExpandableState(container);
+    }
+
+    function renderResultSummary(reportSections) {
+      const container = $("result-summary");
+      const entries = Object.entries(reportSections || {}).filter(([, content]) => Boolean(content));
+      if (!entries.length) {
+        container.innerHTML = "";
+        return;
+      }
+
+      container.innerHTML = entries
+        .map(([key]) => `<span class="summary-chip">${escapeHtml(reportTitles[key] || key)}</span>`)
+        .join("");
+    }
+
+    function renderSpeechTimeline(snapshot) {
+      const container = $("speech-timeline");
+      const entries = [...(snapshot.events || [])
+        .filter((event) => ["message", "tool", "report"].includes(event.type))
+        .filter((event) => event.agent && event.agent !== "System")]
+        .sort((left, right) => (right.id || 0) - (left.id || 0));
+
+      if (!entries.length) {
+        container.innerHTML = `<div class="empty">等待角色开始发言...</div>`;
+        return;
+      }
+
+      container.innerHTML = entries
+        .map((event, index) => {
+          const isLatest = index === 0;
+          const teamTitle = getTeamTitleByStageId(event.stage_id);
+          return `
+            <details
+              class="timeline-entry${isLatest ? " latest" : ""}"
+              data-expand-key="timeline:${escapeHtml(String(event.id))}"
+              data-dynamic-detail="true"
+              ${isExpanded(`timeline:${event.id}`, isLatest) ? "open" : ""}
+            >
+              <summary>
+                <div class="timeline-summary">
+                  <div class="timeline-main">
+                    <div class="timeline-title">${escapeHtml(event.agent)}</div>
+                    <div class="timeline-badges">
+                      <span class="summary-chip">${escapeHtml(teamTitle)}</span>
+                      <span class="event-type ${escapeHtml(event.type)}">${escapeHtml(event.type)}</span>
+                      <span class="summary-chip">${escapeHtml(event.timestamp || "-")}</span>
+                    </div>
+                  </div>
+                </div>
+              </summary>
+              <div class="timeline-body">
+                <div class="timeline-content">
+                  <pre>${escapeHtml(event.content || "")}</pre>
+                </div>
+              </div>
+            </details>
+          `;
+        })
+        .join("");
+      bindExpandableState(container);
+    }
+
+    function renderCurrentFocus(snapshot) {
+      const focus = snapshot.current_focus_event;
+      $("current-focus-agent").textContent = `Agent: ${focus?.agent || snapshot.current_agent || "-"}`;
+      $("current-focus-type").textContent = `类型: ${focus?.type || "-"}`;
+      $("current-focus-time").textContent = `时间: ${focus?.timestamp || "-"}`;
+
+      const contentNode = $("current-focus-content");
+      contentNode.textContent = focus?.content || "当前还没有可展示的发言内容。";
+      contentNode.className = focus?.content ? "" : "empty";
+    }
+
+    function renderSnapshot(snapshot) {
+      state.snapshot = snapshot;
+
+      const statusPill = $("run-status-pill");
+      statusPill.textContent = `STATUS: ${snapshot.status.toUpperCase()}`;
+      statusPill.className = `pill ${snapshot.status}`;
+      updateActionButtons(snapshot);
+      setFormDisabled(snapshot.status === "running" || snapshot.status === "stopping");
+
+      const currentStageTitle = snapshot.current_stage_title || formatStageName(snapshot.workflow || []);
+      $("current-stage-pill").textContent = `当前阶段: ${currentStageTitle || "-"}`;
+      $("current-stage-pill").className = `pill current-focus ${snapshot.current_stage_id ? "in_progress" : ""}`;
+      $("current-agent-pill").textContent = `当前 Agent: ${snapshot.current_agent || "-"}`;
+      $("current-agent-pill").className = `pill current-focus ${snapshot.current_agent ? "in_progress" : ""}`;
+      $("elapsed-pill").textContent = `耗时: ${snapshot.elapsed_seconds == null ? "--" : `${snapshot.elapsed_seconds}s`}`;
+      $("result-path-pill").textContent = `结果目录: ${snapshot.results_path || "--"}`;
+
+      $("llm-calls").textContent = snapshot.stats.llm_calls;
+      $("tool-calls").textContent = snapshot.stats.tool_calls;
+      $("agents-progress").textContent = `${snapshot.counts.agents_completed} / ${snapshot.counts.agents_total}`;
+      $("reports-progress").textContent = `${snapshot.counts.reports_completed} / ${snapshot.counts.reports_total}`;
+      $("event-count").textContent = snapshot.events?.length || 0;
+      $("process-summary-pill").textContent = `事件数: ${snapshot.events?.length || 0}`;
+
+      const errorBox = $("error-box");
+      if (snapshot.error) {
+        errorBox.innerHTML = `<div class="error-box">${escapeHtml(snapshot.error)}</div>`;
+      } else {
+        errorBox.innerHTML = "";
+      }
+
+      $("current-report").textContent = snapshot.current_report || "等待新的报告片段...";
+      $("current-report").className = snapshot.current_report ? "" : "empty";
+      renderCurrentFocus(snapshot);
+      renderSpeechTimeline(snapshot);
+
+      $("final-report").textContent = snapshot.final_report || "分析完成后，这里会显示整合后的完整报告。";
+      $("final-report").className = snapshot.final_report ? "" : "empty";
+      $("report-file").textContent = snapshot.report_file || "--";
+
+      const decisionBox = $("decision-box");
+      if (snapshot.decision) {
+        decisionBox.innerHTML = `<div class="decision">最终评级: ${escapeHtml(snapshot.decision)}</div>`;
+      } else {
+        decisionBox.innerHTML = "";
+      }
+
+      renderWorkflowOverview(snapshot);
+      renderProcessTree(snapshot.process_tree, snapshot);
+      renderResultSummary(snapshot.report_sections);
+      applyStaticExpandedState();
+      bindExpandableState(document);
+      syncFormWithSelections(snapshot.selections);
+    }
+
+    async function pollState() {
+      try {
+        const snapshot = await fetchJSON("/api/state");
+        renderSnapshot(snapshot);
+      } catch (error) {
+        console.error(error);
+      }
+    }
+
+    async function init() {
+      applyStaticExpandedState();
+      bindExpandableState(document);
+      const options = await fetchJSON("/api/options");
+      renderOptions(options);
+      renderEventFilters();
+
+      $("provider").addEventListener("change", () => {
+        updateModelSelects();
+        updateProviderFields();
+      });
+      $("start-button").addEventListener("click", handlePrimaryAction);
+      $("reset-button").addEventListener("click", resetDashboard);
+
+      await pollState();
+      state.pollingTimer = setInterval(pollState, 1500);
+    }
+
+    init().catch((error) => {
+      alert(error.message);
+      console.error(error);
+    });
+  </script>
+</body>
+</html>
