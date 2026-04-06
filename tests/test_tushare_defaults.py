@@ -14,22 +14,23 @@ class TushareDefaultsTests(unittest.TestCase):
     def setUp(self):
         set_config(DEFAULT_CONFIG.copy())
 
-    def test_default_data_vendors_use_tushare(self):
+    def test_default_data_vendors_match_project_defaults(self):
         config = get_config()
         self.assertEqual(config["data_vendors"]["core_stock_apis"], "tushare")
         self.assertEqual(config["data_vendors"]["technical_indicators"], "tushare")
         self.assertEqual(config["data_vendors"]["fundamental_data"], "tushare")
-        self.assertEqual(config["data_vendors"]["news_data"], "tushare")
+        self.assertEqual(config["data_vendors"]["news_data"], "tavily")
 
-    def test_vendor_lookup_returns_tushare_for_all_categories(self):
-        for category in (
-            "core_stock_apis",
-            "technical_indicators",
-            "fundamental_data",
-            "news_data",
-        ):
+    def test_vendor_lookup_returns_expected_vendors_for_categories(self):
+        expected_vendors = {
+            "core_stock_apis": "tushare",
+            "technical_indicators": "tushare",
+            "fundamental_data": "tushare",
+            "news_data": "tavily",
+        }
+        for category, vendor in expected_vendors.items():
             with self.subTest(category=category):
-                self.assertEqual(get_vendor(category), "tushare")
+                self.assertEqual(get_vendor(category), vendor)
 
     def test_placeholder_tools_return_stable_messages(self):
         news = get_news("600519.SH", "2025-04-01", "2025-04-02")

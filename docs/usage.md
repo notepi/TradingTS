@@ -23,10 +23,13 @@ ANTHROPIC_API_KEY=
 XAI_API_KEY=
 OPENROUTER_API_KEY=
 
-# Tushare citydata 代理（默认数据源必需）
+# Tushare citydata 代理（A股数据必需）
 CITYDATA_TOKEN=
 # 或
 TUSHARE_TOKEN=
+
+# Tavily（新闻数据必需）
+TAVILY_API_KEYS=
 ```
 
 ## 2. 股票代码格式
@@ -61,13 +64,26 @@ tradingagents
 python -m cli.main
 ```
 
-### 方式二：直接跑示例
+### 方式二：Web Dashboard
+
+```bash
+tradingagents dashboard              # 启动 Dashboard (http://127.0.0.1:8765)
+tradingagents dashboard --port 9000  # 指定端口
+```
+
+Dashboard 功能：
+- 可视化配置分析师、LLM、输出语言
+- 实时显示分析进度和代理状态
+- 历史运行记录查看和删除
+- 多语言翻译显示
+
+### 方式三：直接跑示例
 
 ```bash
 python main.py
 ```
 
-### 方式三：Python API
+### 方式四：Python API
 
 ```python
 from dotenv import load_dotenv
@@ -155,5 +171,5 @@ reports/<ticker>_<timestamp>/
 ## 6. 当前版本注意事项
 
 - 默认数据源四类都已切到 `tushare`
-- 行情、指标、基本面是 Tushare 实数数据
-- `get_news`、`get_global_news`、`get_insider_transactions` 目前是稳定占位返回，不是实时新闻源
+- 行情、指标、基本面是 Tushare 实数据
+- 新闻数据通过 Tavily API 获取实时新闻

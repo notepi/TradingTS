@@ -10,6 +10,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Dict
 
+from dotenv import load_dotenv
 from rich.console import Console
 
 from cli.analysis_runtime import (
@@ -20,14 +21,17 @@ from cli.analysis_runtime import (
     finalize_buffer,
 )
 from cli.display_translation import DisplayTranslator
+from cli.history_loader import delete_dashboard_run, list_dashboard_runs, load_dashboard_run
 from cli.reporting import save_report_to_disk
 from cli.stats_handler import StatsCallbackHandler
+from cli.translated_run_materializer import materialize_translated_run
 from tradingagents.default_config import DEFAULT_CONFIG
 from tradingagents.graph.trading_graph import TradingAgentsGraph
 from tradingagents.llm_clients.model_catalog import MODEL_OPTIONS, get_model_options
 
 
 console = Console()
+load_dotenv()
 
 PROVIDER_BASE_URLS = {
     "openai": "https://api.openai.com/v1",
@@ -38,6 +42,7 @@ PROVIDER_BASE_URLS = {
     "dashscope": "https://coding.dashscope.aliyuncs.com/v1",
     "ollama": "http://localhost:11434/v1",
 }
+TRANSLATION_MODEL_ENV = "TRANSLATION_MODEL"
 OUTPUT_LANGUAGES = [
     "English",
     "Chinese",
@@ -96,6 +101,14 @@ def _preferred_model(provider: str, mode: str, fallback: str | None = None) -> s
     if fallback and fallback in options:
         return fallback
     return options[0]
+
+
+def _translation_model(provider: str, payload: Dict[str, Any] | None = None) -> str:
+    env_model = (os.getenv(TRANSLATION_MODEL_ENV) or "").strip()
+    if env_model:
+        return env_model
+    payload = payload or {}
+    return str(payload.get("quick_think_llm") or _preferred_model(provider, "quick"))
 
 
 def get_dashboard_defaults() -> Dict[str, Any]:
@@ -227,6 +240,9 @@ class DashboardSession:
         self._selections = None
         self._thread = None
         self._display_translator: DisplayTranslator | None = None
+        self._historical_snapshot: Dict[str, Any] | None = None
+        self._translator_signature: tuple[Any, ...] | None = None
+        self._file_write_lock = threading.RLock()
 
     def options(self) -> Dict[str, Any]:
         return {
@@ -239,6 +255,16 @@ class DashboardSession:
             "provider_base_urls": PROVIDER_BASE_URLS,
         }
 
+    def history(self) -> Dict[str, Any]:
+        return {"runs": list_dashboard_runs()}
+
+    def translate_text(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        text = str(payload.get("text") or "")
+        if not text.strip():
+            return {"translated": text}
+        translator = self._ensure_display_translator(payload)
+        return {"translated": translator.translate_text(text)}
+
     def start(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         selections = normalize_dashboard_request(payload)
 
@@ -249,6 +275,8 @@ class DashboardSession:
             if self._display_translator is not None:
                 self._display_translator.close()
                 self._display_translator = None
+                self._translator_signature = None
+            self._historical_snapshot = None
 
             run_stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             run_dir = (
@@ -281,11 +309,12 @@ class DashboardSession:
             self._display_translator = DisplayTranslator(
                 output_language=selections.get("output_language", "English"),
                 provider=selections["llm_provider"],
-                model=selections["quick_think_llm"],
+                model=_translation_model(selections["llm_provider"], selections),
                 base_url=selections["backend_url"],
                 google_thinking_level=selections.get("google_thinking_level"),
                 openai_reasoning_effort=selections.get("openai_reasoning_effort"),
                 anthropic_effort=selections.get("anthropic_effort"),
+                cache_dir=str(run_dir.resolve()),
             )
 
             self._thread = threading.Thread(
@@ -318,6 +347,7 @@ class DashboardSession:
             if self._display_translator is not None:
                 self._display_translator.close()
                 self._display_translator = None
+                self._translator_signature = None
 
             self._buffer = AnalysisBuffer()
             self._stats_handler = StatsCallbackHandler()
@@ -331,10 +361,86 @@ class DashboardSession:
             self._report_file = None
             self._selections = None
             self._thread = None
+            self._historical_snapshot = None
 
         return self.snapshot()
 
+    def load_history(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        run_id = str(payload.get("run_id") or "").strip()
+        if not run_id:
+            raise ValueError("run_id is required.")
+        with self._lock:
+            if self._status in {"running", "stopping"}:
+                raise RuntimeError("Cannot load history while an analysis is running.")
+            self._display_translator = self._ensure_display_translator(payload)
+            historical_snapshot = load_dashboard_run(
+                run_id,
+                language=str(payload.get("output_language") or "English"),
+            )
+            selections = dict(historical_snapshot.get("selections") or {})
+            selections["output_language"] = str(
+                payload.get("output_language") or selections.get("output_language") or "English"
+            )
+            if payload.get("llm_provider"):
+                selections["llm_provider"] = str(payload.get("llm_provider"))
+            if payload.get("quick_think_llm"):
+                selections["quick_think_llm"] = str(payload.get("quick_think_llm"))
+            if payload.get("backend_url"):
+                selections["backend_url"] = str(payload.get("backend_url"))
+            historical_snapshot["selections"] = selections
+            self._historical_snapshot = historical_snapshot
+
+        return self.snapshot()
+
+    def delete_history(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        run_id = str(payload.get("run_id") or "").strip()
+        if not run_id:
+            raise ValueError("run_id is required.")
+
+        with self._lock:
+            if self._status in {"running", "stopping"}:
+                raise RuntimeError("Cannot delete history while an analysis is running.")
+            active_run_id = (
+                str(self._historical_snapshot.get("history_run_id"))
+                if self._historical_snapshot
+                else None
+            )
+
+        delete_dashboard_run(run_id)
+
+        with self._lock:
+            if active_run_id == run_id:
+                self._historical_snapshot = None
+                self._buffer = AnalysisBuffer()
+                self._stats_handler = StatsCallbackHandler()
+                self._status = "idle"
+                self._error = None
+                self._decision = None
+                self._started_at = None
+                self._finished_at = None
+                self._results_path = None
+                self._report_file = None
+                self._selections = None
+                self._thread = None
+
+        return {
+            "deleted_run_id": run_id,
+            "runs": list_dashboard_runs(),
+            "snapshot": self.snapshot(),
+        }
+
     def snapshot(self) -> Dict[str, Any]:
+        with self._lock:
+            historical_snapshot = self._historical_snapshot
+            status = self._status
+            display_translator = self._display_translator
+
+        if historical_snapshot is not None and status == "idle":
+            snapshot = dict(historical_snapshot)
+            if display_translator is not None:
+                snapshot = display_translator.localize_snapshot(snapshot)
+            return snapshot
+
         buffer_snapshot = self._buffer.snapshot()
         stats = self._stats_handler.get_stats()
 
@@ -366,15 +472,67 @@ class DashboardSession:
             "report_file": report_file,
             "selections": selections,
             "stop_requested": stop_requested,
+            "translation_error": display_translator.last_error if display_translator is not None else None,
             "stats": stats,
             **buffer_snapshot,
         }
 
         if display_translator is not None:
-            display_translator.queue_snapshot(snapshot)
             snapshot = display_translator.localize_snapshot(snapshot)
 
         return snapshot
+
+    def _ensure_display_translator(self, payload: Dict[str, Any]) -> DisplayTranslator:
+        signature = self._translator_settings_signature(payload)
+        with self._lock:
+            if self._display_translator is None or self._translator_signature != signature:
+                if self._display_translator is not None:
+                    self._display_translator.close()
+                self._display_translator = self._create_display_translator(payload)
+                self._translator_signature = signature
+            return self._display_translator
+
+    @staticmethod
+    def _translator_settings_signature(payload: Dict[str, Any]) -> tuple[Any, ...]:
+        provider = str(payload.get("llm_provider") or _recommended_provider())
+        return (
+            str(payload.get("output_language") or "English"),
+            provider,
+            _translation_model(provider, payload),
+            str(
+                payload.get("backend_url")
+                or PROVIDER_BASE_URLS.get(provider, DEFAULT_CONFIG["backend_url"])
+            ),
+            str(payload.get("cache_dir") or payload.get("results_path") or payload.get("run_id") or ""),
+            payload.get("google_thinking_level"),
+            payload.get("openai_reasoning_effort"),
+            payload.get("anthropic_effort"),
+        )
+
+    @staticmethod
+    def _create_display_translator(payload: Dict[str, Any]) -> DisplayTranslator:
+        provider = str(payload.get("llm_provider") or _recommended_provider())
+        return DisplayTranslator(
+            output_language=str(payload.get("output_language") or "English"),
+            provider=provider,
+            model=_translation_model(provider, payload),
+            base_url=str(
+                payload.get("backend_url")
+                or PROVIDER_BASE_URLS.get(provider, DEFAULT_CONFIG["backend_url"])
+            ),
+            google_thinking_level=payload.get("google_thinking_level"),
+            openai_reasoning_effort=payload.get("openai_reasoning_effort"),
+            anthropic_effort=payload.get("anthropic_effort"),
+            cache_dir=str(
+                payload.get("cache_dir")
+                or payload.get("results_path")
+                or (
+                    Path(DEFAULT_CONFIG["results_dir"]) / str(payload.get("run_id"))
+                    if payload.get("run_id")
+                    else ""
+                )
+            ),
+        )
 
     def _run_analysis(self, selections: Dict[str, Any], run_dir: Path) -> None:
         try:
@@ -444,6 +602,12 @@ class DashboardSession:
                 "System", f"Completed analysis for {selections['analysis_date']}"
             )
             report_file = save_report_to_disk(final_state, selections["ticker"], run_dir)
+            if self._display_translator is not None:
+                materialize_translated_run(
+                    run_dir,
+                    selections.get("output_language", "English"),
+                    self._display_translator,
+                )
 
             with self._lock:
                 self._decision = decision
@@ -465,32 +629,32 @@ class DashboardSession:
             error_log = run_dir / "dashboard_error.log"
             error_log.write_text(traceback.format_exc(), encoding="utf-8")
 
-    @staticmethod
-    def _build_message_hook(log_file: Path):
+    def _build_message_hook(self, log_file: Path):
         def hook(timestamp: str, message_type: str, content: str) -> None:
             flattened = content.replace("\n", " ")
-            with open(log_file, "a", encoding="utf-8") as handle:
-                handle.write(f"{timestamp} [{message_type}] {flattened}\n")
+            with self._file_write_lock:
+                with open(log_file, "a", encoding="utf-8") as handle:
+                    handle.write(f"{timestamp} [{message_type}] {flattened}\n")
 
         return hook
 
-    @staticmethod
-    def _build_tool_hook(log_file: Path):
+    def _build_tool_hook(self, log_file: Path):
         def hook(timestamp: str, tool_name: str, args: Any) -> None:
             if isinstance(args, dict):
                 args_str = ", ".join(f"{key}={value}" for key, value in args.items())
             else:
                 args_str = str(args)
-            with open(log_file, "a", encoding="utf-8") as handle:
-                handle.write(f"{timestamp} [Tool Call] {tool_name}({args_str})\n")
+            with self._file_write_lock:
+                with open(log_file, "a", encoding="utf-8") as handle:
+                    handle.write(f"{timestamp} [Tool Call] {tool_name}({args_str})\n")
 
         return hook
 
-    @staticmethod
-    def _build_report_hook(report_dir: Path):
+    def _build_report_hook(self, report_dir: Path):
         def hook(section_name: str, content: str) -> None:
             section_file = report_dir / f"{section_name}.md"
-            section_file.write_text(content, encoding="utf-8")
+            with self._file_write_lock:
+                section_file.write_text(content, encoding="utf-8")
 
         return hook
 
@@ -513,8 +677,14 @@ def serve_dashboard(host: str = "127.0.0.1", port: int = 8765) -> None:
             if path == "/api/options":
                 self._write_json(HTTPStatus.OK, session.options())
                 return
+            if path == "/api/history":
+                self._write_json(HTTPStatus.OK, session.history())
+                return
             if path == "/api/state":
                 self._write_json(HTTPStatus.OK, session.snapshot())
+                return
+            if path == "/api/translate":
+                self._write_json(HTTPStatus.METHOD_NOT_ALLOWED, {"error": "Use POST for translation."})
                 return
             self._write_json(HTTPStatus.NOT_FOUND, {"error": "Not found"})
 
@@ -543,6 +713,18 @@ def serve_dashboard(host: str = "127.0.0.1", port: int = 8765) -> None:
                     snapshot = session.reset()
                     self._write_json(HTTPStatus.OK, snapshot)
                     return
+                if path == "/api/history/load":
+                    snapshot = session.load_history(payload)
+                    self._write_json(HTTPStatus.OK, snapshot)
+                    return
+                if path == "/api/history/delete":
+                    deletion = session.delete_history(payload)
+                    self._write_json(HTTPStatus.OK, deletion)
+                    return
+                if path == "/api/translate":
+                    translated = session.translate_text(payload)
+                    self._write_json(HTTPStatus.OK, translated)
+                    return
             except RuntimeError as exc:
                 self._write_json(HTTPStatus.CONFLICT, {"error": str(exc)})
                 return
@@ -559,6 +741,9 @@ def serve_dashboard(host: str = "127.0.0.1", port: int = 8765) -> None:
             body = html_text.encode("utf-8")
             self.send_response(HTTPStatus.OK)
             self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+            self.send_header("Pragma", "no-cache")
+            self.send_header("Expires", "0")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
@@ -567,6 +752,9 @@ def serve_dashboard(host: str = "127.0.0.1", port: int = 8765) -> None:
             body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
             self.send_response(status)
             self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+            self.send_header("Pragma", "no-cache")
+            self.send_header("Expires", "0")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)

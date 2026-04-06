@@ -179,6 +179,93 @@
       margin-top: 18px;
     }
 
+    .history-panel {
+      margin-top: 18px;
+      padding-top: 18px;
+      border-top: 1px solid rgba(29, 42, 36, 0.08);
+    }
+
+    .history-list {
+      display: grid;
+      gap: 10px;
+      max-height: 360px;
+      overflow: auto;
+      margin-top: 12px;
+    }
+
+    .history-item {
+      padding: 12px 14px;
+      border-radius: 14px;
+      border: 1px solid rgba(29, 42, 36, 0.08);
+      background: rgba(255, 255, 255, 0.92);
+      color: var(--ink);
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 12px;
+      align-items: start;
+    }
+
+    .history-item.active {
+      border-color: rgba(15, 118, 110, 0.22);
+      background: rgba(228, 248, 243, 0.72);
+    }
+
+    .history-item-main {
+      min-width: 0;
+      border: none;
+      background: transparent;
+      padding: 0;
+      text-align: left;
+      color: inherit;
+      border-radius: 0;
+      box-shadow: none;
+    }
+
+    .history-item-main:hover {
+      transform: none;
+    }
+
+    .history-item-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      justify-content: flex-end;
+      align-self: stretch;
+    }
+
+    .history-delete {
+      padding: 8px 10px;
+      min-width: 42px;
+      border-radius: 12px;
+      border: 1px solid rgba(180, 35, 24, 0.18);
+      background: rgba(255, 255, 255, 0.94);
+      color: var(--danger);
+      box-shadow: none;
+    }
+
+    .history-delete:hover {
+      transform: none;
+      background: rgba(180, 35, 24, 0.08);
+    }
+
+    .history-item-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+
+    .history-item-title {
+      font-weight: 800;
+    }
+
+    .history-item-meta {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
     button {
       border: none;
       cursor: pointer;
@@ -477,6 +564,16 @@
       margin-top: 16px;
     }
 
+    .summary-preview {
+      margin-top: 16px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.82);
+      border: 1px solid rgba(29, 42, 36, 0.08);
+      padding: 14px;
+      max-height: 360px;
+      overflow: auto;
+    }
+
     .summary-chip {
       border-radius: 999px;
       padding: 8px 12px;
@@ -484,6 +581,21 @@
       border: 1px solid rgba(15, 118, 110, 0.08);
       font-size: 13px;
       font-weight: 700;
+    }
+
+    button.summary-chip {
+      cursor: pointer;
+      color: var(--ink);
+    }
+
+    button.summary-chip:hover {
+      transform: translateY(-1px);
+      background: rgba(214, 239, 232, 0.72);
+    }
+
+    button.summary-chip.active {
+      background: linear-gradient(135deg, rgba(15, 118, 110, 0.18), rgba(180, 83, 9, 0.14));
+      border-color: rgba(15, 118, 110, 0.22);
     }
 
     .decision {
@@ -825,6 +937,16 @@
       <p class="muted" style="margin-top:14px;">
         这个页面不改变原来的多代理执行链路，只把状态、过程和输出整合成可回溯的过程视图。
       </p>
+      <div class="history-panel">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+          <h3>历史分析</h3>
+          <button class="secondary" id="refresh-history-button" type="button" style="padding:8px 12px;">刷新</button>
+        </div>
+        <div class="muted">直接加载本地历史结果，不重新执行分析。</div>
+        <div class="history-list" id="history-list">
+          <div class="empty">正在读取历史分析...</div>
+        </div>
+      </div>
     </aside>
 
     <main class="content">
@@ -970,6 +1092,9 @@
               </summary>
               <div class="fold-body">
                 <div class="result-summary" id="result-summary"></div>
+                <div class="summary-preview">
+                  <pre id="summary-preview" class="empty">点上面的标签后，这里显示对应报告内容。</pre>
+                </div>
               </div>
             </details>
 
@@ -1013,6 +1138,8 @@
   <script>
     const expandedStorageKey = "tradingagents_dashboard_expanded";
 
+    const DASHBOARD_DEFAULT_OUTPUT_LANGUAGE = "Chinese";
+
     const state = {
       options: null,
       snapshot: null,
@@ -1022,6 +1149,11 @@
       formDirty: false,
       lastSyncedSelectionSignature: null,
       expanded: loadExpandedState(),
+      history: [],
+      lastHistoryRefreshAt: 0,
+      translationCache: {},
+      translationPending: new Set(),
+      selectedReportSection: null,
     };
 
     const eventFilterOptions = [
@@ -1068,6 +1200,13 @@
       trader_investment_plan: "Trading Team Plan",
       final_trade_decision: "Portfolio Management Decision",
     };
+
+    function focusReportSection(sectionKey) {
+      state.selectedReportSection = sectionKey;
+      if (state.snapshot) {
+        renderSnapshot(state.snapshot);
+      }
+    }
 
     const analystNameMap = {
       market: "Market Analyst",
@@ -1153,6 +1292,92 @@
       return payload;
     }
 
+    function getTranslationSettings() {
+      return {
+        output_language: $("output-language")?.value || DASHBOARD_DEFAULT_OUTPUT_LANGUAGE,
+        llm_provider: $("provider")?.value || "dashscope",
+        quick_think_llm: $("quick-model")?.value || "",
+        backend_url: state.options?.provider_base_urls?.[$("provider")?.value] || "",
+        results_path: state.snapshot?.results_path || "",
+        run_id: state.snapshot?.history_run_id || "",
+        google_thinking_level: $("google-thinking")?.value || "",
+        openai_reasoning_effort: $("openai-effort")?.value || "",
+        anthropic_effort: $("anthropic-effort")?.value || "",
+      };
+    }
+
+    function buildTranslationKey(text, settings) {
+      return JSON.stringify({
+        text,
+        output_language: settings.output_language,
+        llm_provider: settings.llm_provider,
+        quick_think_llm: settings.quick_think_llm,
+      });
+    }
+
+    function buildPreviewText(text, maxLength = 420) {
+      const normalized = String(text || "").trim();
+      if (!normalized) {
+        return "";
+      }
+      return normalized.length > maxLength
+        ? `${normalized.slice(0, maxLength).trimEnd()}...`
+        : normalized;
+    }
+
+    async function translateVisibleContent() {
+      const settings = getTranslationSettings();
+      if (settings.output_language === "English") {
+        return;
+      }
+
+      const nodes = [...document.querySelectorAll("[data-translate='agent-output']")];
+      const uniqueTasks = new Map();
+
+      for (const node of nodes) {
+        const original = node.dataset.originalContent || node.textContent || "";
+        if (!original.trim()) {
+          continue;
+        }
+        const key = buildTranslationKey(original, settings);
+        if (state.translationCache[key]) {
+          node.textContent = state.translationCache[key];
+          continue;
+        }
+        if (state.translationPending.has(key)) {
+          continue;
+        }
+        if (!uniqueTasks.has(key)) {
+          uniqueTasks.set(key, { original, nodes: [] });
+        }
+        uniqueTasks.get(key).nodes.push(node);
+      }
+
+      for (const [key, task] of uniqueTasks.entries()) {
+        state.translationPending.add(key);
+        fetchJSON("/api/translate", {
+          method: "POST",
+          body: JSON.stringify({
+            text: task.original,
+            ...settings,
+          }),
+        })
+          .then((payload) => {
+            const translated = payload.translated || task.original;
+            state.translationCache[key] = translated;
+            task.nodes.forEach((node) => {
+              node.textContent = translated;
+            });
+          })
+          .catch((error) => {
+            console.error(error);
+          })
+          .finally(() => {
+            state.translationPending.delete(key);
+          });
+      }
+    }
+
     function populateSelect(element, items, selectedValue) {
       element.innerHTML = items
         .map(
@@ -1214,6 +1439,9 @@
 
     function renderOptions(options) {
       state.options = options;
+      const defaultOutputLanguage = options.languages.includes(DASHBOARD_DEFAULT_OUTPUT_LANGUAGE)
+        ? DASHBOARD_DEFAULT_OUTPUT_LANGUAGE
+        : options.defaults.output_language;
 
       populateSelect(
         $("research-depth"),
@@ -1239,7 +1467,7 @@
           value: language,
           label: language,
         })),
-        options.defaults.output_language
+        defaultOutputLanguage
       );
 
       $("ticker").value = options.defaults.ticker;
@@ -1308,6 +1536,136 @@
       updateActionButtons(state.snapshot);
     }
 
+    function formatHistoryStatus(status) {
+      if (!status) return "-";
+      return status;
+    }
+
+    function renderHistory(runs) {
+      state.history = runs || [];
+      const container = $("history-list");
+      if (!state.history.length) {
+        container.innerHTML = `<div class="empty">还没有可加载的历史分析。</div>`;
+        return;
+      }
+
+      const activeRunId = state.snapshot?.history_run_id || null;
+      container.innerHTML = state.history
+        .map((run) => `
+          <div class="history-item${activeRunId === run.id ? " active" : ""}">
+            <button
+              type="button"
+              class="history-item-main"
+              data-history-run="${escapeHtml(run.id)}"
+            >
+              <div class="history-item-head">
+                <div class="history-item-title">${escapeHtml(run.ticker)}</div>
+                <span class="pill ${escapeHtml(run.status)}">${escapeHtml(formatHistoryStatus(run.status))}</span>
+              </div>
+              <div class="history-item-meta">
+                <div>${escapeHtml(run.analysis_date || "-")}</div>
+                <div>${escapeHtml(run.run_name || "-")}</div>
+                <div>${escapeHtml(run.started_at || run.updated_at || "-")}</div>
+              </div>
+            </button>
+            <div class="history-item-actions">
+              <button
+                type="button"
+                class="history-delete"
+                data-delete-history-run="${escapeHtml(run.id)}"
+                title="删除本地历史"
+                aria-label="删除本地历史"
+              >
+                删
+              </button>
+            </div>
+          </div>
+        `)
+        .join("");
+
+      container.querySelectorAll("[data-history-run]").forEach((button) => {
+        button.addEventListener("click", () => {
+          loadHistoryRun(button.dataset.historyRun);
+        });
+      });
+
+      container.querySelectorAll("[data-delete-history-run]").forEach((button) => {
+        button.addEventListener("click", async (event) => {
+          event.stopPropagation();
+          const runId = button.dataset.deleteHistoryRun;
+          const confirmed = window.confirm(`确认从本地删除这条历史分析吗？\n\n${runId}`);
+          if (!confirmed) {
+            return;
+          }
+          await deleteHistoryRun(runId);
+        });
+      });
+    }
+
+    async function refreshHistory(force = false) {
+      const now = Date.now();
+      if (!force && now - state.lastHistoryRefreshAt < 5000) {
+        return;
+      }
+      const payload = await fetchJSON("/api/history");
+      state.lastHistoryRefreshAt = now;
+      renderHistory(payload.runs || []);
+    }
+
+    async function loadHistoryRun(runId) {
+      setActionPending(true);
+      try {
+        state.selectedReportSection = null;
+        const snapshot = await fetchJSON("/api/history/load", {
+          method: "POST",
+          body: JSON.stringify({
+            run_id: runId,
+            output_language: $("output-language").value,
+            llm_provider: $("provider").value,
+            quick_think_llm: $("quick-model").value,
+            backend_url: state.options?.provider_base_urls?.[$("provider").value] || "",
+            google_thinking_level: $("google-thinking").value,
+            openai_reasoning_effort: $("openai-effort").value,
+            anthropic_effort: $("anthropic-effort").value,
+          }),
+        });
+        state.snapshot = snapshot;
+        syncFormWithSelections(snapshot.selections, { force: true });
+        renderSnapshot(snapshot);
+        await refreshHistory(true);
+      } catch (error) {
+        alert(error.message);
+      } finally {
+        setActionPending(false);
+      }
+    }
+
+    async function deleteHistoryRun(runId) {
+      setActionPending(true);
+      try {
+        const payload = await fetchJSON("/api/history/delete", {
+          method: "POST",
+          body: JSON.stringify({ run_id: runId }),
+        });
+        state.history = payload.runs || [];
+        renderHistory(state.history);
+        state.snapshot = payload.snapshot;
+        renderSnapshot(payload.snapshot);
+      } catch (error) {
+        alert(error.message);
+      } finally {
+        setActionPending(false);
+      }
+    }
+
+    async function reloadCurrentHistoryRun() {
+      const runId = state.snapshot?.history_run_id;
+      if (!runId || !state.snapshot?.history_loaded || state.actionPending) {
+        return;
+      }
+      await loadHistoryRun(runId);
+    }
+
     function updateActionButtons(snapshot) {
       const primaryButton = $("start-button");
       const resetButton = $("reset-button");
@@ -1359,6 +1717,7 @@
 
       setActionPending(true);
       try {
+        state.selectedReportSection = null;
         const snapshot = await fetchJSON("/api/start", {
           method: "POST",
           body: JSON.stringify(payload),
@@ -1366,6 +1725,7 @@
         state.snapshot = snapshot;
         syncFormWithSelections(snapshot.selections, { force: true });
         renderSnapshot(snapshot);
+        await refreshHistory(true);
       } catch (error) {
         alert(error.message);
       } finally {
@@ -1392,12 +1752,14 @@
     async function resetDashboard() {
       setActionPending(true);
       try {
+        state.selectedReportSection = null;
         const snapshot = await fetchJSON("/api/reset", {
           method: "POST",
           body: JSON.stringify({}),
         });
         state.snapshot = snapshot;
         renderSnapshot(snapshot);
+        await refreshHistory(true);
       } catch (error) {
         alert(error.message);
       } finally {
@@ -1422,7 +1784,17 @@
         return;
       }
 
-      const signature = getSelectionSignature(selections);
+      const normalizedSelections = { ...selections };
+      const shouldPreferDashboardDefault =
+        normalizedSelections.output_language === "English" &&
+        !state.snapshot?.history_loaded &&
+        (state.snapshot?.status || "idle") === "idle" &&
+        !state.snapshot?.started_at;
+      if (shouldPreferDashboardDefault) {
+        normalizedSelections.output_language = DASHBOARD_DEFAULT_OUTPUT_LANGUAGE;
+      }
+
+      const signature = getSelectionSignature(normalizedSelections);
       if (!force && state.formDirty) {
         return;
       }
@@ -1430,20 +1802,20 @@
         return;
       }
 
-      $("ticker").value = selections.ticker;
-      $("analysis-date").value = selections.analysis_date;
-      $("research-depth").value = String(selections.research_depth);
-      $("provider").value = selections.llm_provider;
+      $("ticker").value = normalizedSelections.ticker;
+      $("analysis-date").value = normalizedSelections.analysis_date;
+      $("research-depth").value = String(normalizedSelections.research_depth);
+      $("provider").value = normalizedSelections.llm_provider;
       updateModelSelects();
       updateProviderFields();
-      $("quick-model").value = selections.quick_think_llm;
-      $("deep-model").value = selections.deep_think_llm;
-      $("output-language").value = selections.output_language;
-      $("google-thinking").value = selections.google_thinking_level || "";
-      $("openai-effort").value = selections.openai_reasoning_effort || "";
-      $("anthropic-effort").value = selections.anthropic_effort || "";
+      $("quick-model").value = normalizedSelections.quick_think_llm;
+      $("deep-model").value = normalizedSelections.deep_think_llm;
+      $("output-language").value = normalizedSelections.output_language;
+      $("google-thinking").value = normalizedSelections.google_thinking_level || "";
+      $("openai-effort").value = normalizedSelections.openai_reasoning_effort || "";
+      $("anthropic-effort").value = normalizedSelections.anthropic_effort || "";
 
-      const selectedAnalysts = new Set(selections.analysts || []);
+      const selectedAnalysts = new Set(normalizedSelections.analysts || []);
       for (const input of document.querySelectorAll('#analyst-list input[type="checkbox"]')) {
         input.checked = selectedAnalysts.has(input.value);
       }
@@ -1606,15 +1978,18 @@
                               ? `<div class="stage-agent-stream">
                                   ${visibleEvents
                                     .map(
-                                      (event, eventIndex) => `
+                                      (event, eventIndex) => {
+                                        const previewText = buildPreviewText(event.content || "");
+                                        return `
                                         <div class="stage-agent-entry${eventIndex === 0 ? " latest" : ""}">
                                           <div class="stage-agent-entry-meta">
                                             <span class="event-type ${escapeHtml(event.type || "message")}">${escapeHtml(event.type || "message")}</span>
                                             <span class="summary-chip">${escapeHtml(event.timestamp || "-")}</span>
                                           </div>
-                                          <pre>${escapeHtml(event.content || "")}</pre>
+                                          <pre${["report", "message"].includes(event.type || "") ? ` data-translate="agent-output" data-original-content="${escapeHtml(previewText)}"` : ""}>${escapeHtml(previewText)}</pre>
                                         </div>
-                                      `
+                                      `;
+                                      }
                                     )
                                     .join("")}
                                 </div>`
@@ -1756,7 +2131,7 @@
                                       </div>
                                     </summary>
                                     <div class="event-body">
-                                      <pre>${escapeHtml(event.content)}</pre>
+                                      <pre${["message", "report"].includes(event.type || "") ? ` data-translate="agent-output" data-original-content="${escapeHtml(event.content || "")}"` : ""}>${escapeHtml(event.content)}</pre>
                                     </div>
                                   </details>
                                 `)
@@ -1777,15 +2152,45 @@
 
     function renderResultSummary(reportSections) {
       const container = $("result-summary");
+      const preview = $("summary-preview");
       const entries = Object.entries(reportSections || {}).filter(([, content]) => Boolean(content));
       if (!entries.length) {
         container.innerHTML = "";
+        preview.textContent = "点上面的标签后，这里显示对应报告内容。";
+        preview.className = "empty";
+        delete preview.dataset.translate;
+        delete preview.dataset.originalContent;
         return;
       }
 
       container.innerHTML = entries
-        .map(([key]) => `<span class="summary-chip">${escapeHtml(reportTitles[key] || key)}</span>`)
+        .map(([key]) => `
+          <button
+            type="button"
+            class="summary-chip${state.selectedReportSection === key ? " active" : ""}"
+            data-report-section="${escapeHtml(key)}"
+          >
+            ${escapeHtml(reportTitles[key] || key)}
+          </button>
+        `)
         .join("");
+
+      container.querySelectorAll("[data-report-section]").forEach((button) => {
+        button.addEventListener("click", () => {
+          focusReportSection(button.dataset.reportSection);
+        });
+      });
+
+      const selectedKey =
+        state.selectedReportSection && reportSections[state.selectedReportSection]
+          ? state.selectedReportSection
+          : entries[0][0];
+      const selectedTitle = reportTitles[selectedKey] || selectedKey;
+      const selectedContent = reportSections[selectedKey];
+      preview.textContent = `### ${selectedTitle}\n${selectedContent}`;
+      preview.className = "";
+      preview.dataset.translate = "agent-output";
+      preview.dataset.originalContent = `### ${selectedTitle}\n${selectedContent}`;
     }
 
     function renderSpeechTimeline(snapshot) {
@@ -1825,7 +2230,7 @@
               </summary>
               <div class="timeline-body">
                 <div class="timeline-content">
-                  <pre>${escapeHtml(event.content || "")}</pre>
+                  <pre${["message", "report"].includes(event.type || "") ? ` data-translate="agent-output" data-original-content="${escapeHtml(event.content || "")}"` : ""}>${escapeHtml(event.content || "")}</pre>
                 </div>
               </div>
             </details>
@@ -1843,6 +2248,13 @@
 
       const contentNode = $("current-focus-content");
       contentNode.textContent = focus?.content || "当前还没有可展示的发言内容。";
+      if (focus?.content && ["report", "message"].includes(focus?.type || "")) {
+        contentNode.dataset.translate = "agent-output";
+        contentNode.dataset.originalContent = focus.content;
+      } else {
+        delete contentNode.dataset.translate;
+        delete contentNode.dataset.originalContent;
+      }
       contentNode.className = focus?.content ? "" : "empty";
     }
 
@@ -1878,6 +2290,13 @@
       }
 
       $("current-report").textContent = snapshot.current_report || "等待新的报告片段...";
+      if (snapshot.current_report) {
+        $("current-report").dataset.translate = "agent-output";
+        $("current-report").dataset.originalContent = snapshot.current_report;
+      } else {
+        delete $("current-report").dataset.translate;
+        delete $("current-report").dataset.originalContent;
+      }
       $("current-report").className = snapshot.current_report ? "" : "empty";
       renderCurrentFocus(snapshot);
       renderSpeechTimeline(snapshot);
@@ -1899,12 +2318,22 @@
       applyStaticExpandedState();
       bindExpandableState(document);
       syncFormWithSelections(snapshot.selections);
+      translateVisibleContent();
     }
 
     async function pollState() {
       try {
         const snapshot = await fetchJSON("/api/state");
-        renderSnapshot(snapshot);
+        const shouldFreezeHistory =
+          Boolean(state.snapshot?.history_loaded) &&
+          snapshot.status !== "running" &&
+          snapshot.status !== "stopping";
+        if (!shouldFreezeHistory) {
+          renderSnapshot(snapshot);
+        }
+        if (!shouldFreezeHistory && snapshot.status !== "running" && snapshot.status !== "stopping") {
+          await refreshHistory();
+        }
       } catch (error) {
         console.error(error);
       }
@@ -1921,9 +2350,14 @@
         updateModelSelects();
         updateProviderFields();
       });
+      $("output-language").addEventListener("change", () => {
+        reloadCurrentHistoryRun();
+      });
       $("start-button").addEventListener("click", handlePrimaryAction);
       $("reset-button").addEventListener("click", resetDashboard);
+      $("refresh-history-button").addEventListener("click", () => refreshHistory(true));
 
+      await refreshHistory(true);
       await pollState();
       state.pollingTimer = setInterval(pollState, 1500);
     }

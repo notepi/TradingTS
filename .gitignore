@@ -222,3 +222,4 @@ __marimo__/
 eval_results/
 srcMO/
 .DS_Store
+.claude/

@@ -1,83 +1,41 @@
-# TradingAgents Project
+# TradingAgents
 
-> Multi-Agents LLM Financial Trading Framework - 多代理 LLM 金融交易框架
+## 背景
 
-**文档：** [快速使用说明](docs/usage.md) | [完整使用说明](docs/USER_GUIDE.md) | [README](README.md)
+- 定位: 多代理 LLM 金融交易框架
+- 目的: 模拟真实交易公司，协同评估市场并做出交易决策
+- 技术栈: Python 3.10+, LangGraph, LangChain
+- 数据源: Tushare citydata (A股) + Tavily (新闻)
+- 默认 LLM: DashScope GLM-5
 
-## Project Overview
+## 项目开发协作流程
 
-TradingAgents 是一个多代理交易框架，模拟真实交易公司的运作方式。通过部署专门的 LLM 代理团队：基本面分析师、情绪分析师、技术分析师、交易员、风险管理团队，协同评估市场状况并做出交易决策。
+严格按以下顺序执行：
+1. 用户定任务（新功能、bug 修复、代码审查等）
+2. Claude 做 plan → 写入项目目录 `.claude/plans/`
+3. 用户确认 plan
+4. Claude 执行
+5. 测试验证
+6. **用户确认测试通过后**，Claude 才能修改 CLAUDE.md
 
-**技术栈**: Python 3.10+, LangGraph, LangChain, Tushare citydata proxy
+## 操作指令
 
-**入口点**:
-- CLI: `tradingagents` 命令或 `python -m cli.main`
-- Python API: `TradingAgentsGraph` 类
-
-## Directory Structure
-
-```
-TradingAgents/
-├── cli/                    # CLI 交互界面
-│   ├── main.py             # CLI 入口 (typer app)
-│   ├── config.py           # CLI 配置
-│   └── utils.py            # CLI 工具函数
-├── tradingagents/          # 核心框架
-│   ├── agents/             # 代理实现
-│   │   ├── analysts/       # 分析师团队 (基本面、新闻、情绪、技术)
-│   │   ├── researchers/    # 研究员团队 (多头、空头)
-│   │   ├── trader/         # 交易员
-│   │   ├── risk_mgmt/      # 风险管理 (激进、保守、中立辩论者)
-│   │   ├── managers/       # 管理层 (投资组合经理、研究经理)
-│   │   └── utils/          # 代理工具函数
-│   ├── dataflows/          # 数据流处理
-│   │   ├── y_finance.py    # Yahoo Finance 数据接口
-│   │   └── alpha_vantage_*.py  # Alpha Vantage API
-│   ├── graph/              # LangGraph 工作流
-│   │   ├── trading_graph.py    # 主图入口
-│   │   ├── setup.py        # 图初始化
-│   │   └── propagation.py  # 前向传播
-│   ├── llm_clients/        # LLM 客户端
-│   │   ├── factory.py      # 客户端工厂
-│   │   ├── model_catalog.py    # 模型选项
-│   │   └── *_client.py     # 各提供商客户端
-│   └── default_config.py   # 默认配置
-├── tests/                  # 测试文件
-├── main.py                 # 快速运行示例
-└── results/                # 运行结果输出
-```
-
-## Key Files
-
-| File | Purpose |
-|------|---------|
-| [main.py](main.py) | 快速运行示例，单股票分析 |
-| [tradingagents/default_config.py](tradingagents/default_config.py) | 默认配置：LLM、数据源、辩论轮数 |
-| [tradingagents/graph/trading_graph.py](tradingagents/graph/trading_graph.py) | 核心图类 `TradingAgentsGraph` |
-| [tradingagents/llm_clients/model_catalog.py](tradingagents/llm_clients/model_catalog.py) | 支持的模型列表 |
-| [cli/main.py](cli/main.py) | CLI 入口 |
-
-## Running the Project
-
-### 1. Environment Setup
+### 快速运行
 
 ```bash
-# 已有 .env 文件，确保 LLM API Key 与 Tushare token 已配置
-# 支持的提供商：openai, google, anthropic, xai, openrouter, dashscope, ollama
-# 数据源默认：tushare (CITYDATA_TOKEN / TUSHARE_TOKEN)
-
-# 激活虚拟环境
-source .venv/bin/activate  # 或 conda activate tradingagents
+uv run python main.py                    # 单股票分析（默认 688333.SH）
 ```
 
-### 2. CLI Mode
+### CLI 模式
 
 ```bash
-tradingagents          # 交互式 CLI
-python -m cli.main     # 直接运行
+tradingagents                            # 交互式 CLI
+tradingagents dashboard                  # Web Dashboard
+tradingagents dashboard --port 9000      # 指定端口
+python -m cli.main                       # 直接运行
 ```
 
-### 3. Python API
+### Python API
 
 ```python
 from tradingagents.graph.trading_graph import TradingAgentsGraph
@@ -96,70 +54,57 @@ _, decision = ta.propagate("600519.SH", "2024-05-10")
 print(decision)
 ```
 
-## Configuration
+## 数据说明
 
-### LLM Providers
+### 环境配置
 
-| Provider | API Key Env Var | Example Models |
-|----------|-----------------|----------------|
-| openai | OPENAI_API_KEY | gpt-5.4, gpt-5.4-mini, gpt-5.4-pro |
-| anthropic | ANTHROPIC_API_KEY | claude-opus-4-6, claude-sonnet-4-6 |
-| google | GOOGLE_API_KEY | gemini-3.1-pro, gemini-3-flash |
-| xai | XAI_API_KEY | grok-4, grok-4-fast-reasoning |
-| openrouter | OPENROUTER_API_KEY | nvidia/nemotron-3-nano-30b-a3b:free |
-| dashscope | DASHSCOPE_API_KEY | glm-5 |
-| ollama | (本地) | qwen3:latest, glm-4.7-flash:latest |
+`.env` 文件：
 
-### Data Vendors
+```
+# 必需
+DASHSCOPE_API_KEY=sk-xxx        # LLM API Key
+CITYDATA_TOKEN=xxx              # A股数据
+TAVILY_API_KEYS=tvly-xxx        # 新闻搜索
 
-默认使用 `tushare` citydata 代理，需配置 `CITYDATA_TOKEN` 或 `TUSHARE_TOKEN`。当前项目定位为 A 股模式；新闻、全球新闻和 insider 在 Tushare 模式下返回占位提示文本。
-
-### Key Config Options
-
-```python
-config["llm_provider"] = "openai"       # LLM 提供商
-config["deep_think_llm"] = "gpt-5.4"    # 复杂推理模型
-config["quick_think_llm"] = "gpt-5.4-mini"  # 快速任务模型
-config["max_debate_rounds"] = 1         # 辩论轮数
-config["max_risk_discuss_rounds"] = 1   # 风险讨论轮数
-config["output_language"] = "English"   # 输出语言
+# 可选
+TUSHARE_TOKEN=xxx               # Tushare 原生 token
+TRANSLATION_MODEL=glm-5         # 翻译模型覆盖
 ```
 
-## Development Guidelines
+### 数据源映射
 
-### Code Style
-- PEP 8 规范
-- 类型注解
-- 使用 black/ruff 格式化
+| 数据类型 | 默认源 | 环境变量 |
+|----------|--------|----------|
+| 行情 OHLCV | Tushare citydata | CITYDATA_TOKEN |
+| 技术指标 | Tushare citydata | CITYDATA_TOKEN |
+| 基本面 | Tushare citydata | CITYDATA_TOKEN |
+| 新闻 | Tavily | TAVILY_API_KEYS |
 
-### Testing
-```bash
-pytest tests/
-pytest --cov=tradingagents
-```
+### 文件位置
 
-### Agent Flow
-1. **Analysts** → 分析市场数据（基本面、新闻、情绪、技术）
-2. **Researchers** → 多空辩论，评估风险收益
-3. **Trader** → 综合报告，做出交易决策
-4. **Risk Management** → 风险评估，调整策略
-5. **Portfolio Manager** → 最终批准/拒绝
+| 目录 | 内容 |
+|------|------|
+| cli/ | CLI 交互界面 |
+| cli/dashboard.py | Web Dashboard 服务 |
+| tradingagents/ | 核心框架 |
+| tradingagents/agents/ | 代理实现 |
+| tradingagents/dataflows/ | 数据接口 |
+| tradingagents/llm_clients/ | LLM 客户端 |
+| results/ | 运行结果输出 |
 
-## Notes
+## 文档索引
 
-- 项目用于研究目的，不构成投资建议
-- 默认使用 Tushare citydata 代理，需配置 token
-- LLM 调用会产生 API 费用，注意控制成本
-- `eval_results/` 和 `srcMO/` 是临时目录，已忽略
+| 文档 | 内容 |
+|------|------|
+| [README.md](README.md) | 项目介绍 |
+| [docs/usage.md](docs/usage.md) | 快速使用说明 |
+| [docs/USER_GUIDE.md](docs/USER_GUIDE.md) | 完整使用说明 |
 
 ## 改造说明
 
 相比原始版本，本项目做了以下优化：
 
-1. **新增 DashScope 支持** - 添加阿里云通义千问/GLM 作为 LLM 提供商，国内用户无需翻墙
-2. **简化所有 Agent Prompt** - 大幅精简 prompt，减少 token 消耗和 API 成本
-3. **限制输出长度** - 所有代理输出限制在 180-220 字，提高效率
-4. **工作流优化** - 支持跳过辩论和风险讨论环节（设置 `max_debate_rounds=0` 或 `max_risk_discuss_rounds=0`）
-5. **技术指标优化** - 从最多 8 个指标减少到 4 个，聚焦关键信号
-6. **报告格式简化** - 更简洁清晰的报告输出
-7. **默认数据源切换为 Tushare citydata** - 项目当前默认面向 A 股，保持 graph 与 agent 接口不变
+1. **新增 DashScope 支持** - 国内用户无需翻墙
+2. **新增 Tavily 新闻源** - 替代 Tushare placeholder
+3. **新增 Web Dashboard** - 可视化操作界面
+4. **多语言输出** - 支持 11 种语言

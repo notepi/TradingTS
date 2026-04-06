@@ -31,7 +31,7 @@ DEFAULT_CONFIG = {
         "core_stock_apis": "tushare",        # Default A-share OHLCV source
         "technical_indicators": "tushare",   # Default A-share technical indicators
         "fundamental_data": "tushare",       # Default A-share fundamentals and statements
-        "news_data": "tushare",              # Placeholder responses in Tushare citydata mode
+        "news_data": "tavily",               # Tavily news search (requires TAVILY_API_KEYS)
     },
     # Tool-level configuration (takes precedence over category-level)
     "tool_vendors": {
