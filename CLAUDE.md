@@ -12,11 +12,12 @@
 
 严格按以下顺序执行：
 1. 用户定任务（新功能、bug 修复、代码审查等）
-2. Claude 做 plan → 写入项目目录 `.claude/plans/`
+2. Claude 做 plan → 写入项目目录 `.claude/plans/active/`
 3. 用户确认 plan
 4. Claude 执行
 5. 测试验证
 6. **用户确认测试通过后**，Claude 才能修改 CLAUDE.md
+7. plan 归档到 `.claude/plans/archive/`
 
 ## 操作指令
 
