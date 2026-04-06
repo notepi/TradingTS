@@ -27,6 +27,7 @@
 
     body {
       margin: 0;
+      padding: 0 15px;
       font-family: var(--sans);
       color: var(--ink);
       background:
@@ -40,7 +41,6 @@
       max-width: 1440px;
       width: 100%;
       margin: 18px auto 34px;
-      padding: 0 15px;
       display: grid;
       grid-template-columns: 360px minmax(0, 1fr);
       gap: 20px;
@@ -838,8 +838,11 @@
     }
 
     @media (max-width: 760px) {
-      .shell {
+      body {
         padding: 0 9px;
+      }
+
+      .shell {
         margin: 10px auto 24px;
       }
 
