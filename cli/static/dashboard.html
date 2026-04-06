@@ -38,8 +38,9 @@
 
     .shell {
       max-width: 1440px;
-      width: calc(100vw - 30px);
+      width: 100%;
       margin: 18px auto 34px;
+      padding: 0 15px;
       display: grid;
       grid-template-columns: 360px minmax(0, 1fr);
       gap: 20px;
@@ -838,7 +839,7 @@
 
     @media (max-width: 760px) {
       .shell {
-        width: calc(100vw - 18px);
+        padding: 0 9px;
         margin: 10px auto 24px;
       }
 
@@ -861,6 +862,7 @@
         grid-template-columns: 1fr;
       }
     }
+
   </style>
 </head>
 <body>
