@@ -318,6 +318,25 @@ class DashboardRuntimeTests(unittest.TestCase):
             self.assertEqual(snapshot["final_report"], "# 中文完整报告")
             self.assertEqual(snapshot["report_sections"]["trader_investment_plan"], "交易员中文版本")
 
+    def test_snapshot_prefers_loaded_history_when_not_running(self):
+        session = DashboardSession()
+        session._status = "stopped"
+        session._historical_snapshot = {
+            "status": "completed",
+            "counts": {"agents_completed": 12, "agents_total": 12},
+            "workflow": [{"id": "research", "status": "completed"}],
+            "current_agent": "Portfolio Manager",
+            "decision": "BUY",
+            "history_loaded": True,
+        }
+
+        snapshot = session.snapshot()
+
+        self.assertEqual(snapshot["status"], "completed")
+        self.assertEqual(snapshot["counts"]["agents_completed"], 12)
+        self.assertEqual(snapshot["current_agent"], "Portfolio Manager")
+        self.assertTrue(snapshot["history_loaded"])
+
     def test_runtime_member_output_writes_translated_member_file_for_analyst(self):
         with TemporaryDirectory() as tmpdir:
             run_dir = Path(tmpdir) / "688333.SH" / "2026-04-05" / "dashboard_20260405_214612"

@@ -488,7 +488,7 @@ class DashboardSession:
             completed_snapshot = self._completed_snapshot
             status = self._status
 
-        if historical_snapshot is not None and status == "idle":
+        if historical_snapshot is not None and status not in {"running", "stopping"}:
             return dict(historical_snapshot)
 
         if completed_snapshot is not None and status == "completed":
