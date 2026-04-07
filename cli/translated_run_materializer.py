@@ -71,6 +71,8 @@ def materialize_translated_run(
             original_text,
             force=force_refresh,
         )
+        # 将翻译结果加入缓存，供 localize_snapshot 使用
+        translator.cache_document(original_text, translated_text)
         target = translated_path(root, language, relative)
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(translated_text, encoding="utf-8")

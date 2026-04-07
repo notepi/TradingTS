@@ -122,6 +122,20 @@ class DisplayTranslator:
         self._persistent_cache.set(stripped, translated)
         return translated
 
+    def cache_document(self, original: str, translated: str) -> None:
+        """将整篇翻译结果加入缓存，供后续 localize_snapshot 使用。
+
+        用于 materialize_translated_run 完成后，将翻译结果加载到内存缓存，
+        避免 localize_snapshot 在运行期间触发额外的翻译调用。
+        """
+        if not self.enabled:
+            return
+        stripped = original.strip()
+        translated_stripped = translated.strip()
+        with self._lock:
+            self._cache[stripped] = translated_stripped
+        self._persistent_cache.set(stripped, translated_stripped)
+
     def queue_snapshot(self, snapshot: dict[str, Any]) -> None:
         if not self.enabled:
             return

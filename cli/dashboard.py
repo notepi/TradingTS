@@ -477,7 +477,8 @@ class DashboardSession:
             **buffer_snapshot,
         }
 
-        if display_translator is not None:
+        # 运行期间不翻译，只在完成后翻译，减少 token 消耗
+        if display_translator is not None and status == "completed":
             snapshot = display_translator.localize_snapshot(snapshot)
 
         return snapshot
