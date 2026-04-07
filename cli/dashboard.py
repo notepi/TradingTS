@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime
+import hashlib
 import json
 import os
 import threading
@@ -18,13 +19,15 @@ from cli.analysis_runtime import (
     ANALYST_ORDER,
     AnalysisBuffer,
     apply_stream_chunk,
+    build_process_tree,
     finalize_buffer,
+    pick_current_focus_event,
 )
 from cli.display_translation import DisplayTranslator
 from cli.history_loader import delete_dashboard_run, list_dashboard_runs, load_dashboard_run
 from cli.reporting import save_report_to_disk
 from cli.stats_handler import StatsCallbackHandler
-from cli.translated_run_materializer import materialize_translated_run
+from cli.translated_run_materializer import load_translated_text, materialize_translated_run, translated_path
 from tradingagents.default_config import DEFAULT_CONFIG
 from tradingagents.graph.trading_graph import TradingAgentsGraph
 from tradingagents.llm_clients.model_catalog import MODEL_OPTIONS, get_model_options
@@ -79,6 +82,47 @@ ANALYST_OPTIONS = [
     {"label": "News Analyst", "value": "news"},
     {"label": "Fundamentals Analyst", "value": "fundamentals"},
 ]
+RUNTIME_AGENT_FILE_MAP = {
+    "Market Analyst": Path("1_analysts/market.md"),
+    "Social Analyst": Path("1_analysts/sentiment.md"),
+    "News Analyst": Path("1_analysts/news.md"),
+    "Fundamentals Analyst": Path("1_analysts/fundamentals.md"),
+    "Bull Researcher": Path("2_research/bull.md"),
+    "Bear Researcher": Path("2_research/bear.md"),
+    "Research Manager": Path("2_research/manager.md"),
+    "Trader": Path("3_trading/trader.md"),
+    "Aggressive Analyst": Path("4_risk/aggressive.md"),
+    "Conservative Analyst": Path("4_risk/conservative.md"),
+    "Neutral Analyst": Path("4_risk/neutral.md"),
+    "Portfolio Manager": Path("5_portfolio/decision.md"),
+}
+RUNTIME_AGENT_EVENT_HEADINGS = {
+    "Bull Researcher": "### Bull Researcher Analysis",
+    "Bear Researcher": "### Bear Researcher Analysis",
+    "Research Manager": "### Research Manager Decision",
+    "Aggressive Analyst": "### Aggressive Analyst Analysis",
+    "Conservative Analyst": "### Conservative Analyst Analysis",
+    "Neutral Analyst": "### Neutral Analyst Analysis",
+    "Portfolio Manager": "### Portfolio Manager Decision",
+}
+RUNTIME_SECTION_MEMBERS = {
+    "market_report": [("Market Analyst", None)],
+    "sentiment_report": [("Social Analyst", None)],
+    "news_report": [("News Analyst", None)],
+    "fundamentals_report": [("Fundamentals Analyst", None)],
+    "investment_plan": [
+        ("Bull Researcher", "### Bull Researcher Analysis"),
+        ("Bear Researcher", "### Bear Researcher Analysis"),
+        ("Research Manager", "### Research Manager Decision"),
+    ],
+    "trader_investment_plan": [("Trader", None)],
+    "final_trade_decision": [
+        ("Aggressive Analyst", "### Aggressive Analyst Analysis"),
+        ("Conservative Analyst", "### Conservative Analyst Analysis"),
+        ("Neutral Analyst", "### Neutral Analyst Analysis"),
+        ("Portfolio Manager", "### Portfolio Manager Decision"),
+    ],
+}
 
 
 def _recommended_provider() -> str:
@@ -241,8 +285,11 @@ class DashboardSession:
         self._thread = None
         self._display_translator: DisplayTranslator | None = None
         self._historical_snapshot: Dict[str, Any] | None = None
+        self._completed_snapshot: Dict[str, Any] | None = None
         self._translator_signature: tuple[Any, ...] | None = None
         self._file_write_lock = threading.RLock()
+        self._runtime_translation_hashes: Dict[str, str] = {}
+        self._runtime_translation_pending: Dict[str, str] = {}
 
     def options(self) -> Dict[str, Any]:
         return {
@@ -258,13 +305,6 @@ class DashboardSession:
     def history(self) -> Dict[str, Any]:
         return {"runs": list_dashboard_runs()}
 
-    def translate_text(self, payload: Dict[str, Any]) -> Dict[str, Any]:
-        text = str(payload.get("text") or "")
-        if not text.strip():
-            return {"translated": text}
-        translator = self._ensure_display_translator(payload)
-        return {"translated": translator.translate_text(text)}
-
     def start(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         selections = normalize_dashboard_request(payload)
 
@@ -277,6 +317,9 @@ class DashboardSession:
                 self._display_translator = None
                 self._translator_signature = None
             self._historical_snapshot = None
+            self._completed_snapshot = None
+            self._runtime_translation_hashes = {}
+            self._runtime_translation_pending = {}
 
             run_stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             run_dir = (
@@ -362,6 +405,9 @@ class DashboardSession:
             self._selections = None
             self._thread = None
             self._historical_snapshot = None
+            self._completed_snapshot = None
+            self._runtime_translation_hashes = {}
+            self._runtime_translation_pending = {}
 
         return self.snapshot()
 
@@ -373,6 +419,9 @@ class DashboardSession:
             if self._status in {"running", "stopping"}:
                 raise RuntimeError("Cannot load history while an analysis is running.")
             self._display_translator = self._ensure_display_translator(payload)
+            self._completed_snapshot = None
+            self._runtime_translation_hashes = {}
+            self._runtime_translation_pending = {}
             historical_snapshot = load_dashboard_run(
                 run_id,
                 language=str(payload.get("output_language") or "English"),
@@ -388,6 +437,7 @@ class DashboardSession:
             if payload.get("backend_url"):
                 selections["backend_url"] = str(payload.get("backend_url"))
             historical_snapshot["selections"] = selections
+            historical_snapshot = self._display_translator.localize_snapshot(historical_snapshot)
             self._historical_snapshot = historical_snapshot
 
         return self.snapshot()
@@ -422,6 +472,9 @@ class DashboardSession:
                 self._report_file = None
                 self._selections = None
                 self._thread = None
+                self._completed_snapshot = None
+                self._runtime_translation_hashes = {}
+                self._runtime_translation_pending = {}
 
         return {
             "deleted_run_id": run_id,
@@ -432,14 +485,14 @@ class DashboardSession:
     def snapshot(self) -> Dict[str, Any]:
         with self._lock:
             historical_snapshot = self._historical_snapshot
+            completed_snapshot = self._completed_snapshot
             status = self._status
-            display_translator = self._display_translator
 
         if historical_snapshot is not None and status == "idle":
-            snapshot = dict(historical_snapshot)
-            if display_translator is not None:
-                snapshot = display_translator.localize_snapshot(snapshot)
-            return snapshot
+            return dict(historical_snapshot)
+
+        if completed_snapshot is not None and status == "completed":
+            return dict(completed_snapshot)
 
         buffer_snapshot = self._buffer.snapshot()
         stats = self._stats_handler.get_stats()
@@ -474,12 +527,26 @@ class DashboardSession:
             "stop_requested": stop_requested,
             "translation_error": display_translator.last_error if display_translator is not None else None,
             "stats": stats,
+            "translation_stats": display_translator.get_stats() if display_translator is not None else {
+                "translation_calls": 0,
+                "translation_tokens_in": 0,
+                "translation_tokens_out": 0,
+                "translation_documents": 0,
+                "translation_failures": 0,
+                "enabled": False,
+                "language": selections.get("output_language") if selections else "English",
+                "provider": None,
+                "model": None,
+            },
             **buffer_snapshot,
         }
 
-        # 运行期间不翻译，只在完成后翻译，减少 token 消耗
-        if display_translator is not None and status == "completed":
-            snapshot = display_translator.localize_snapshot(snapshot)
+        if status in {"running", "stopping"} and results_path and selections:
+            snapshot = self._localize_running_snapshot(
+                snapshot,
+                run_dir=Path(results_path),
+                language=str(selections.get("output_language") or "English"),
+            )
 
         return snapshot
 
@@ -536,6 +603,33 @@ class DashboardSession:
         )
 
     def _run_analysis(self, selections: Dict[str, Any], run_dir: Path) -> None:
+        def persist_usage_stats() -> None:
+            analysis_stats = self._stats_handler.get_stats()
+            translation_stats = (
+                self._display_translator.get_stats()
+                if self._display_translator is not None
+                else {
+                    "translation_calls": 0,
+                    "translation_tokens_in": 0,
+                    "translation_tokens_out": 0,
+                    "translation_documents": 0,
+                    "translation_failures": 0,
+                    "enabled": False,
+                    "language": selections.get("output_language", "English"),
+                    "provider": None,
+                    "model": None,
+                }
+            )
+            with self._file_write_lock:
+                (run_dir / "analysis_stats.json").write_text(
+                    json.dumps(analysis_stats, ensure_ascii=False, indent=2),
+                    encoding="utf-8",
+                )
+                (run_dir / "translation_stats.json").write_text(
+                    json.dumps(translation_stats, ensure_ascii=False, indent=2),
+                    encoding="utf-8",
+                )
+
         try:
             config = DEFAULT_CONFIG.copy()
             config["max_debate_rounds"] = selections["research_depth"]
@@ -582,6 +676,7 @@ class DashboardSession:
                 if self._stop_requested.is_set():
                     break
                 apply_stream_chunk(self._buffer, chunk)
+                self._sync_runtime_member_outputs(run_dir=run_dir, chunk=chunk)
                 trace.append(chunk)
                 if self._stop_requested.is_set():
                     break
@@ -591,6 +686,7 @@ class DashboardSession:
                     self._status = "stopped"
                     self._finished_at = datetime.datetime.now()
                 self._buffer.add_message("System", "Analysis stopped by user.")
+                persist_usage_stats()
                 return
 
             if not trace:
@@ -609,18 +705,22 @@ class DashboardSession:
                     selections.get("output_language", "English"),
                     self._display_translator,
                 )
+            persist_usage_stats()
+            completed_snapshot = self._build_file_backed_snapshot(run_dir, selections)
 
             with self._lock:
-                self._decision = decision
-                self._report_file = str(report_file.resolve())
+                self._decision = completed_snapshot.get("decision", decision)
+                self._report_file = completed_snapshot.get("report_file") or str(report_file.resolve())
                 self._status = "completed"
                 self._finished_at = datetime.datetime.now()
+                self._completed_snapshot = completed_snapshot
         except Exception as exc:
             if self._stop_requested.is_set():
                 with self._lock:
                     self._status = "stopped"
                     self._finished_at = datetime.datetime.now()
                 self._buffer.add_message("System", "Analysis stopped by user.")
+                persist_usage_stats()
                 return
             with self._lock:
                 self._status = "error"
@@ -629,6 +729,7 @@ class DashboardSession:
             self._buffer.add_message("System", f"Error: {exc}")
             error_log = run_dir / "dashboard_error.log"
             error_log.write_text(traceback.format_exc(), encoding="utf-8")
+            persist_usage_stats()
 
     def _build_message_hook(self, log_file: Path):
         def hook(timestamp: str, message_type: str, content: str) -> None:
@@ -659,6 +760,312 @@ class DashboardSession:
 
         return hook
 
+    def _sync_runtime_member_outputs(self, *, run_dir: Path, chunk: Dict[str, Any]) -> None:
+        member_outputs: list[tuple[str, str]] = []
+
+        analyst_chunks = [
+            ("market_report", "Market Analyst"),
+            ("sentiment_report", "Social Analyst"),
+            ("news_report", "News Analyst"),
+            ("fundamentals_report", "Fundamentals Analyst"),
+        ]
+        for section_name, agent_name in analyst_chunks:
+            content = str(chunk.get(section_name) or "").strip()
+            if content:
+                member_outputs.append((agent_name, content))
+
+        trader_plan = str(chunk.get("trader_investment_plan") or "").strip()
+        if trader_plan:
+            member_outputs.append(("Trader", trader_plan))
+
+        debate_state = chunk.get("investment_debate_state") or {}
+        judge = str(debate_state.get("judge_decision") or "").strip()
+        if judge:
+            bull_hist = str(debate_state.get("bull_history") or "").strip()
+            bear_hist = str(debate_state.get("bear_history") or "").strip()
+            if bull_hist:
+                member_outputs.append(("Bull Researcher", bull_hist))
+            if bear_hist:
+                member_outputs.append(("Bear Researcher", bear_hist))
+            member_outputs.append(("Research Manager", judge))
+
+        risk_state = chunk.get("risk_debate_state") or {}
+        risk_judge = str(risk_state.get("judge_decision") or "").strip()
+        if risk_judge:
+            aggressive_hist = str(risk_state.get("aggressive_history") or "").strip()
+            conservative_hist = str(risk_state.get("conservative_history") or "").strip()
+            neutral_hist = str(risk_state.get("neutral_history") or "").strip()
+            if aggressive_hist:
+                member_outputs.append(("Aggressive Analyst", aggressive_hist))
+            if conservative_hist:
+                member_outputs.append(("Conservative Analyst", conservative_hist))
+            if neutral_hist:
+                member_outputs.append(("Neutral Analyst", neutral_hist))
+            member_outputs.append(("Portfolio Manager", risk_judge))
+
+        for agent_name, content in member_outputs:
+            self._write_runtime_member_output(
+                run_dir=run_dir,
+                agent_name=agent_name,
+                content=content,
+            )
+
+    def _write_runtime_member_output(
+        self,
+        *,
+        run_dir: Path,
+        agent_name: str,
+        content: str,
+    ) -> None:
+        relative_path = self._runtime_member_relative_path(agent_name)
+        body = content.strip()
+        if relative_path is None or not body:
+            return
+
+        target = run_dir / relative_path
+        with self._file_write_lock:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            if not target.exists() or target.read_text(encoding="utf-8") != body:
+                target.write_text(body, encoding="utf-8")
+        self._queue_runtime_translation(
+            run_dir=run_dir,
+            relative_path=relative_path,
+        )
+
+    def _queue_runtime_translation(
+        self,
+        *,
+        run_dir: Path,
+        relative_path: Path,
+    ) -> None:
+        source = run_dir / relative_path
+        if not source.exists():
+            return
+
+        stripped = source.read_text(encoding="utf-8").strip()
+        if not stripped:
+            return
+
+        key = relative_path.as_posix()
+        with self._lock:
+            translator = self._display_translator
+            if translator is None or not translator.enabled:
+                return
+            source_hash = hashlib.sha256(stripped.encode("utf-8")).hexdigest()
+            if self._runtime_translation_hashes.get(key) == source_hash:
+                return
+            if self._runtime_translation_pending.get(key) == source_hash:
+                return
+            self._runtime_translation_pending[key] = source_hash
+
+        def worker() -> None:
+            try:
+                translated = translator.translate_document(stripped)
+                translator.cache_document(stripped, translated)
+                with self._lock:
+                    if self._runtime_translation_pending.get(key) != source_hash:
+                        return
+                target = translated_path(run_dir, translator.output_language, relative_path)
+                with self._file_write_lock:
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    target.write_text(translated, encoding="utf-8")
+                with self._lock:
+                    if self._runtime_translation_pending.get(key) == source_hash:
+                        self._runtime_translation_hashes[key] = source_hash
+            finally:
+                with self._lock:
+                    if self._runtime_translation_pending.get(key) == source_hash:
+                        self._runtime_translation_pending.pop(key, None)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    @staticmethod
+    def _runtime_member_relative_path(agent_name: str) -> Path | None:
+        return RUNTIME_AGENT_FILE_MAP.get(agent_name)
+
+    def _localize_running_snapshot(
+        self,
+        snapshot: Dict[str, Any],
+        *,
+        run_dir: Path,
+        language: str,
+    ) -> Dict[str, Any]:
+        localized = dict(snapshot)
+        original_sections = dict(snapshot.get("report_sections") or {})
+        localized_sections: Dict[str, Any] = {}
+        for section_name, content in original_sections.items():
+            localized_sections[section_name] = self._load_runtime_section_content(
+                run_dir=run_dir,
+                language=language,
+                section_name=section_name,
+                fallback=content,
+            )
+        localized["report_sections"] = localized_sections
+
+        latest_report_event_ids: Dict[str, int] = {}
+        for event in snapshot.get("events") or []:
+            if event.get("type") == "report":
+                latest_report_event_ids[str(event.get("agent") or "")] = int(event.get("id") or 0)
+
+        localized_events = []
+        for event in snapshot.get("events") or []:
+            localized_event = dict(event)
+            if (
+                event.get("type") == "report"
+                and latest_report_event_ids.get(str(event.get("agent") or ""))
+                == int(event.get("id") or 0)
+            ):
+                member_content = self._load_runtime_member_content(
+                    run_dir=run_dir,
+                    language=language,
+                    agent_name=str(event.get("agent") or ""),
+                )
+                if member_content:
+                    localized_event["content"] = self._format_runtime_event_content(
+                        str(event.get("agent") or ""),
+                        member_content,
+                    )
+            localized_events.append(localized_event)
+        localized["events"] = localized_events
+
+        latest_report_event = next(
+            (event for event in reversed(localized_events) if event.get("type") == "report"),
+            None,
+        )
+        if latest_report_event is not None:
+            latest_section = str(latest_report_event.get("label") or "")
+            localized["current_report"] = (
+                f"### {AnalysisBuffer.SECTION_TITLES[latest_section]}\n"
+                f"{latest_report_event.get('content') or ''}"
+            )
+        localized["final_report"] = self._compose_report_summary(localized_sections)
+        localized["current_focus_event"] = pick_current_focus_event(
+            localized.get("current_agent"),
+            localized_events,
+        )
+        localized["process_tree"] = build_process_tree(
+            localized.get("agent_status") or {},
+            localized_events,
+        )
+        return localized
+
+    def _load_runtime_section_content(
+        self,
+        *,
+        run_dir: Path,
+        language: str,
+        section_name: str,
+        fallback: str | None,
+    ) -> str | None:
+        members = RUNTIME_SECTION_MEMBERS.get(section_name)
+        if not members:
+            return fallback
+
+        parts: list[str] = []
+        for agent_name, heading in members:
+            member_content = self._load_runtime_member_content(
+                run_dir=run_dir,
+                language=language,
+                agent_name=agent_name,
+            )
+            if member_content:
+                parts.append(
+                    f"{heading}\n{member_content}" if heading else member_content
+                )
+        return "\n\n".join(parts) if parts else fallback
+
+    def _load_runtime_member_content(
+        self,
+        *,
+        run_dir: Path,
+        language: str,
+        agent_name: str,
+    ) -> str | None:
+        relative_path = self._runtime_member_relative_path(agent_name)
+        if relative_path is None:
+            return None
+        translated = load_translated_text(run_dir, language, relative_path)
+        if translated is not None:
+            return translated
+        source = run_dir / relative_path
+        if not source.exists():
+            return None
+        return source.read_text(encoding="utf-8")
+
+    @staticmethod
+    def _format_runtime_event_content(agent_name: str, content: str) -> str:
+        heading = RUNTIME_AGENT_EVENT_HEADINGS.get(agent_name)
+        return f"{heading}\n{content}" if heading else content
+
+    @staticmethod
+    def _compose_report_summary(report_sections: Dict[str, str | None]) -> str | None:
+        report_parts = []
+
+        analyst_sections = [
+            "market_report",
+            "sentiment_report",
+            "news_report",
+            "fundamentals_report",
+        ]
+        if any(report_sections.get(section) for section in analyst_sections):
+            report_parts.append("## Analyst Team Reports")
+            if report_sections.get("market_report"):
+                report_parts.append(
+                    f"### Market Analysis\n{report_sections['market_report']}"
+                )
+            if report_sections.get("sentiment_report"):
+                report_parts.append(
+                    f"### Social Sentiment\n{report_sections['sentiment_report']}"
+                )
+            if report_sections.get("news_report"):
+                report_parts.append(
+                    f"### News Analysis\n{report_sections['news_report']}"
+                )
+            if report_sections.get("fundamentals_report"):
+                report_parts.append(
+                    "### Fundamentals Analysis\n"
+                    f"{report_sections['fundamentals_report']}"
+                )
+
+        if report_sections.get("investment_plan"):
+            report_parts.append("## Research Team Decision")
+            report_parts.append(f"{report_sections['investment_plan']}")
+
+        if report_sections.get("trader_investment_plan"):
+            report_parts.append("## Trading Team Plan")
+            report_parts.append(f"{report_sections['trader_investment_plan']}")
+
+        if report_sections.get("final_trade_decision"):
+            report_parts.append("## Portfolio Management Decision")
+            report_parts.append(f"{report_sections['final_trade_decision']}")
+
+        return "\n\n".join(report_parts) if report_parts else None
+
+    def _build_file_backed_snapshot(
+        self,
+        run_dir: Path,
+        selections: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        results_root = Path(DEFAULT_CONFIG["results_dir"]).resolve()
+        run_id = run_dir.resolve().relative_to(results_root).as_posix()
+        snapshot = load_dashboard_run(
+            run_id,
+            results_root=results_root,
+            language=selections.get("output_language", "English"),
+        )
+        merged_selections = {
+            **(snapshot.get("selections") or {}),
+            **selections,
+        }
+        snapshot["selections"] = merged_selections
+        snapshot["history_loaded"] = False
+        snapshot["translation_error"] = (
+            self._display_translator.last_error if self._display_translator is not None else None
+        )
+        if self._display_translator is not None:
+            snapshot = self._display_translator.localize_snapshot(snapshot)
+        return snapshot
+
 
 def _load_dashboard_html() -> str:
     html_path = Path(__file__).parent / "static" / "dashboard.html"
@@ -683,9 +1090,6 @@ def serve_dashboard(host: str = "127.0.0.1", port: int = 8765) -> None:
                 return
             if path == "/api/state":
                 self._write_json(HTTPStatus.OK, session.snapshot())
-                return
-            if path == "/api/translate":
-                self._write_json(HTTPStatus.METHOD_NOT_ALLOWED, {"error": "Use POST for translation."})
                 return
             self._write_json(HTTPStatus.NOT_FOUND, {"error": "Not found"})
 
@@ -721,10 +1125,6 @@ def serve_dashboard(host: str = "127.0.0.1", port: int = 8765) -> None:
                 if path == "/api/history/delete":
                     deletion = session.delete_history(payload)
                     self._write_json(HTTPStatus.OK, deletion)
-                    return
-                if path == "/api/translate":
-                    translated = session.translate_text(payload)
-                    self._write_json(HTTPStatus.OK, translated)
                     return
             except RuntimeError as exc:
                 self._write_json(HTTPStatus.CONFLICT, {"error": str(exc)})

@@ -18,13 +18,6 @@ TRANSLATABLE_RUN_FILES = (
     "4_risk/conservative.md",
     "4_risk/neutral.md",
     "5_portfolio/decision.md",
-    "reports/market_report.md",
-    "reports/sentiment_report.md",
-    "reports/news_report.md",
-    "reports/fundamentals_report.md",
-    "reports/investment_plan.md",
-    "reports/trader_investment_plan.md",
-    "reports/final_trade_decision.md",
     "complete_report.md",
 )
 
@@ -71,7 +64,7 @@ def materialize_translated_run(
             original_text,
             force=force_refresh,
         )
-        # 将翻译结果加入缓存，供 localize_snapshot 使用
+        # 将整篇结果写入缓存，避免后续重复翻译同一份文档
         translator.cache_document(original_text, translated_text)
         target = translated_path(root, language, relative)
         target.parent.mkdir(parents=True, exist_ok=True)

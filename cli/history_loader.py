@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime
+import json
 import re
 import shutil
 from pathlib import Path
@@ -135,6 +136,32 @@ def load_dashboard_run(
     buffer.report_sections = report_sections
     reports_completed = sum(1 for value in report_sections.values() if value)
 
+    analysis_stats = _load_stats_file(run_dir / "analysis_stats.json")
+    fallback_stats = {
+        "llm_calls": 0,
+        "tool_calls": sum(1 for event in events if event["type"] == "tool"),
+        "tokens_in": 0,
+        "tokens_out": 0,
+    }
+    if analysis_stats is None:
+        analysis_stats = fallback_stats
+    else:
+        analysis_stats = {
+            **fallback_stats,
+            **analysis_stats,
+        }
+    translation_stats = _load_stats_file(run_dir / "translation_stats.json") or {
+        "translation_calls": 0,
+        "translation_tokens_in": 0,
+        "translation_tokens_out": 0,
+        "translation_documents": 0,
+        "translation_failures": 0,
+        "enabled": bool(language and language.strip().lower() != "english"),
+        "language": language or DEFAULT_CONFIG.get("output_language", "English"),
+        "provider": None,
+        "model": None,
+    }
+
     return {
         "status": status,
         "error": _load_error(run_dir),
@@ -156,10 +183,8 @@ def load_dashboard_run(
             "output_language": DEFAULT_CONFIG.get("output_language", "English"),
         },
         "stop_requested": status == "stopped",
-        "stats": {
-            "llm_calls": 0,
-            "tool_calls": sum(1 for event in events if event["type"] == "tool"),
-        },
+        "stats": analysis_stats,
+        "translation_stats": translation_stats,
         "messages": [
             {
                 "timestamp": event["timestamp"],
@@ -235,6 +260,16 @@ def _resolve_run_dir(run_id: str, root: Path) -> Path:
     if root not in candidate.parents and candidate != root:
         raise ValueError("Run path is outside of results directory.")
     return candidate
+
+
+def _load_stats_file(path: Path) -> dict[str, Any] | None:
+    if not path.exists():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, TypeError, ValueError):
+        return None
+    return payload if isinstance(payload, dict) else None
 
 
 def _infer_status(run_dir: Path) -> str:

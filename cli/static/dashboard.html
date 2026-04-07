@@ -1154,8 +1154,6 @@
       expanded: loadExpandedState(),
       history: [],
       lastHistoryRefreshAt: 0,
-      translationCache: {},
-      translationPending: new Set(),
       selectedReportSection: null,
     };
 
@@ -1295,29 +1293,6 @@
       return payload;
     }
 
-    function getTranslationSettings() {
-      return {
-        output_language: $("output-language")?.value || DASHBOARD_DEFAULT_OUTPUT_LANGUAGE,
-        llm_provider: $("provider")?.value || "dashscope",
-        quick_think_llm: $("quick-model")?.value || "",
-        backend_url: state.options?.provider_base_urls?.[$("provider")?.value] || "",
-        results_path: state.snapshot?.results_path || "",
-        run_id: state.snapshot?.history_run_id || "",
-        google_thinking_level: $("google-thinking")?.value || "",
-        openai_reasoning_effort: $("openai-effort")?.value || "",
-        anthropic_effort: $("anthropic-effort")?.value || "",
-      };
-    }
-
-    function buildTranslationKey(text, settings) {
-      return JSON.stringify({
-        text,
-        output_language: settings.output_language,
-        llm_provider: settings.llm_provider,
-        quick_think_llm: settings.quick_think_llm,
-      });
-    }
-
     function buildPreviewText(text, maxLength = 420) {
       const normalized = String(text || "").trim();
       if (!normalized) {
@@ -1326,59 +1301,6 @@
       return normalized.length > maxLength
         ? `${normalized.slice(0, maxLength).trimEnd()}...`
         : normalized;
-    }
-
-    async function translateVisibleContent() {
-      const settings = getTranslationSettings();
-      if (settings.output_language === "English") {
-        return;
-      }
-
-      const nodes = [...document.querySelectorAll("[data-translate='agent-output']")];
-      const uniqueTasks = new Map();
-
-      for (const node of nodes) {
-        const original = node.dataset.originalContent || node.textContent || "";
-        if (!original.trim()) {
-          continue;
-        }
-        const key = buildTranslationKey(original, settings);
-        if (state.translationCache[key]) {
-          node.textContent = state.translationCache[key];
-          continue;
-        }
-        if (state.translationPending.has(key)) {
-          continue;
-        }
-        if (!uniqueTasks.has(key)) {
-          uniqueTasks.set(key, { original, nodes: [] });
-        }
-        uniqueTasks.get(key).nodes.push(node);
-      }
-
-      for (const [key, task] of uniqueTasks.entries()) {
-        state.translationPending.add(key);
-        fetchJSON("/api/translate", {
-          method: "POST",
-          body: JSON.stringify({
-            text: task.original,
-            ...settings,
-          }),
-        })
-          .then((payload) => {
-            const translated = payload.translated || task.original;
-            state.translationCache[key] = translated;
-            task.nodes.forEach((node) => {
-              node.textContent = translated;
-            });
-          })
-          .catch((error) => {
-            console.error(error);
-          })
-          .finally(() => {
-            state.translationPending.delete(key);
-          });
-      }
     }
 
     function populateSelect(element, items, selectedValue) {
@@ -1989,7 +1911,7 @@
                                             <span class="event-type ${escapeHtml(event.type || "message")}">${escapeHtml(event.type || "message")}</span>
                                             <span class="summary-chip">${escapeHtml(event.timestamp || "-")}</span>
                                           </div>
-                                          <pre${["report", "message"].includes(event.type || "") ? ` data-translate="agent-output" data-original-content="${escapeHtml(previewText)}"` : ""}>${escapeHtml(previewText)}</pre>
+                                          <pre>${escapeHtml(previewText)}</pre>
                                         </div>
                                       `;
                                       }
@@ -2134,7 +2056,7 @@
                                       </div>
                                     </summary>
                                     <div class="event-body">
-                                      <pre${["message", "report"].includes(event.type || "") ? ` data-translate="agent-output" data-original-content="${escapeHtml(event.content || "")}"` : ""}>${escapeHtml(event.content)}</pre>
+                                      <pre>${escapeHtml(event.content)}</pre>
                                     </div>
                                   </details>
                                 `)
@@ -2161,8 +2083,6 @@
         container.innerHTML = "";
         preview.textContent = "点上面的标签后，这里显示对应报告内容。";
         preview.className = "empty";
-        delete preview.dataset.translate;
-        delete preview.dataset.originalContent;
         return;
       }
 
@@ -2192,8 +2112,6 @@
       const selectedContent = reportSections[selectedKey];
       preview.textContent = `### ${selectedTitle}\n${selectedContent}`;
       preview.className = "";
-      preview.dataset.translate = "agent-output";
-      preview.dataset.originalContent = `### ${selectedTitle}\n${selectedContent}`;
     }
 
     function renderSpeechTimeline(snapshot) {
@@ -2233,7 +2151,7 @@
               </summary>
               <div class="timeline-body">
                 <div class="timeline-content">
-                  <pre${["message", "report"].includes(event.type || "") ? ` data-translate="agent-output" data-original-content="${escapeHtml(event.content || "")}"` : ""}>${escapeHtml(event.content || "")}</pre>
+                  <pre>${escapeHtml(event.content || "")}</pre>
                 </div>
               </div>
             </details>
@@ -2251,13 +2169,6 @@
 
       const contentNode = $("current-focus-content");
       contentNode.textContent = focus?.content || "当前还没有可展示的发言内容。";
-      if (focus?.content && ["report", "message"].includes(focus?.type || "")) {
-        contentNode.dataset.translate = "agent-output";
-        contentNode.dataset.originalContent = focus.content;
-      } else {
-        delete contentNode.dataset.translate;
-        delete contentNode.dataset.originalContent;
-      }
       contentNode.className = focus?.content ? "" : "empty";
     }
 
@@ -2293,13 +2204,6 @@
       }
 
       $("current-report").textContent = snapshot.current_report || "等待新的报告片段...";
-      if (snapshot.current_report) {
-        $("current-report").dataset.translate = "agent-output";
-        $("current-report").dataset.originalContent = snapshot.current_report;
-      } else {
-        delete $("current-report").dataset.translate;
-        delete $("current-report").dataset.originalContent;
-      }
       $("current-report").className = snapshot.current_report ? "" : "empty";
       renderCurrentFocus(snapshot);
       renderSpeechTimeline(snapshot);
@@ -2321,7 +2225,6 @@
       applyStaticExpandedState();
       bindExpandableState(document);
       syncFormWithSelections(snapshot.selections);
-      translateVisibleContent();
     }
 
     async function pollState() {
