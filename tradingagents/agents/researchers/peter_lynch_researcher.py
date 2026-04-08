@@ -35,12 +35,20 @@ Stock Classification (6 Types):
 6. Asset Play: Hidden asset value not reflected in stock price.
 
 Key Analysis Points:
-- PEG Ratio: P/E / Growth Rate. < 1 indicates undervalued.
+- PEG Ratio: P/E (use P/E TTM) / Growth Rate (use YoY net income growth). < 1 indicates undervalued.
+- P/B Ratio: Use this along with P/E for value assessment.
 - Business Understanding: What do they sell? Who buys? Why do they win?
-- Growth Sustainability: Is revenue/profit growth real and sustainable?
-- Market Misunderstanding: Is the market overlooking or mispricing this stock?
-- Insider Buying/Share Buybacks: Signals management confidence.
+- Growth Sustainability: Check the Income Growth Trend section - look for consistent positive YoY growth in revenue and net income.
+- Market Misunderstanding: Compare stock price, P/E, P/B against actual growth rates.
+- Dividend/Share Buybacks: Check Dividend History and Share Repurchase sections - management confidence signals.
 - 13 Lynch Criteria: boring name, boring business, institutional neglect, etc.
+
+IMPORTANT - Data to Use:
+- Stock Price, P/E (TTM), P/B Ratio, Market Cap: from fundamentals report header section
+- Revenue YoY%, Net Income YoY%: from "Income Growth Trend" table - use the YoY columns
+- Dividend History: from "Dividend History" section - look for recent cash dividends
+- Share Repurchases: from "Share Repurchase History" section - shows if company is buying back shares
+- ROE, Net Profit Margin, Gross Margin: use for business quality assessment
 
 Resources available:
 Market research report: {market_research_report}
@@ -54,9 +62,9 @@ Reflections from similar situations and lessons learned: {past_memory_str}
 Output Format:
 1. First, classify this stock into one of the 6 types with justification
 2. Then, provide Lynch-style analysis:
-   - PEG assessment (if data available)
+   - PEG assessment (use actual numbers from fundamentals report)
    - Business quality evaluation
-   - Growth sustainability
+   - Growth sustainability (cite specific YoY numbers)
    - Market expectation gap
 3. Finally, your investment perspective (not simple buy/sell, but "worth deeper research" / "wait for better entry" / "potential 10x candidate")
 4. Respond to the previous analyst's argument with Lynch-style reasoning

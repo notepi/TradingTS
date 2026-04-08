@@ -29,6 +29,11 @@ def create_fundamentals_analyst(llm):
             "You are a researcher tasked with analyzing fundamental information over the past week about a company. Please write a comprehensive report of the company's fundamental information such as financial documents, company profile, basic company financials, and company financial history to gain a full view of the company's fundamental information to inform traders. Make sure to include as much detail as possible. Provide specific, actionable insights with supporting evidence to help traders make informed decisions."
             + " Make sure to append a Markdown table at the end of the report to organize key points in the report, organized and easy to read."
             + " Use the available tools: `get_fundamentals` for comprehensive company analysis, `get_balance_sheet`, `get_cashflow`, and `get_income_statement` for specific financial statements."
+            + "\n\nIMPORTANT - A股财务数据报告口径说明："
+            + "\n- A股使用'年初至报告期末'累计口径（例如 2025Q3 = 1月1日至9月30日累计值），不是单季数据，更不是 TTM（Trailing Twelve Months）"
+            + "\n- 中国会计准则下的季报和中报都是累计值，只有年报可能提供 TTM 数据（如果提供的话）"
+            + "\n- 在引用财务数据时，必须说明是'累计'口径；在计算同比时，使用的是累计值与去年同期的累计值对比"
+            + "\n- 例如：2025Q3 营收 11.61亿 表示 年初至Q3末 累计营收，不是 Q3 单季营收"
             + get_language_instruction(),
         )
 

@@ -220,6 +220,13 @@ def get_fundamentals(
         # 获取财务指标
         indicator = pro.fina_indicator(ts_code=ts_code)
 
+        # 获取市值和估值数据
+        today_str = datetime.now().strftime("%Y%m%d")
+        daily_basic = pro.daily_basic(ts_code=ts_code, start_date=today_str, end_date=today_str)
+        if daily_basic.empty:
+            # 如果今天没数据，取最近可用交易日
+            daily_basic = pro.daily_basic(ts_code=ts_code, end_date=today_str, limit=1)
+
         # 获取利润表
         income = pro.income(ts_code=ts_code)
 
@@ -247,6 +254,31 @@ def get_fundamentals(
             lines.append(f"Debt to Asset Ratio (%): {latest.get('debt_to_assets', 'N/A')}")
             lines.append(f"Current Ratio: {latest.get('current_ratio', 'N/A')}")
 
+        # 添加市值和估值数据
+        if not daily_basic.empty:
+            db = daily_basic.iloc[0]
+            close = db.get('close', 0)
+            pe = db.get('pe', 0)
+            pe_ttm = db.get('pe_ttm', 0)
+            pb = db.get('pb', 0)
+            total_mv = db.get('total_mv', 0)
+            circ_mv = db.get('circ_mv', 0)
+            total_share = db.get('total_share', 0)
+            if close:
+                lines.append(f"Stock Price (元): {float(close):.2f}")
+            if pe and float(pe) > 0:
+                lines.append(f"P/E Ratio: {float(pe):.2f}")
+            if pe_ttm and float(pe_ttm) > 0:
+                lines.append(f"P/E Ratio (TTM): {float(pe_ttm):.2f}")
+            if pb and float(pb) > 0:
+                lines.append(f"P/B Ratio: {float(pb):.2f}")
+            if total_mv:
+                lines.append(f"Total Market Cap (亿元): {float(total_mv) / 10000:.2f}")
+            if circ_mv:
+                lines.append(f"Circulating Market Cap (亿元): {float(circ_mv) / 10000:.2f}")
+            if total_share:
+                lines.append(f"Total Shares (亿股): {float(total_share) / 10000:.2f}")
+
         # 添加收入和利润数据（单位：亿元）
         if not income.empty:
             inc = income.iloc[0]
@@ -263,6 +295,71 @@ def get_fundamentals(
             ocf = cf.get('n_cashflow_act', 0)
             if ocf:
                 lines.append(f"Operating Cash Flow (亿元): {float(ocf) / 1e8:.2f}")
+
+        # 添加股息历史数据
+        try:
+            dividend_df = pro.dividend(ts_code=ts_code, limit=10)
+            if not dividend_df.empty:
+                lines.append("")
+                lines.append("# Dividend History (近10次分红)")
+                for _, div_row in dividend_df.head(6).iterrows():
+                    year = str(div_row.get('end_date', 'N/A'))[:4]
+                    cash = div_row.get('cash_div', 0)
+                    stk = div_row.get('stk_div', 0)
+                    pay = div_row.get('pay_date', 'N/A')
+                    cash_str = f"{float(cash):.4f}元/股" if cash and float(cash) > 0 else "无现金分红"
+                    stk_str = f"{float(stk):.1f}股/10股" if stk and float(stk) > 0 else ""
+                    pay_str = f", 派息日: {pay}" if pay and str(pay) != 'None' else ""
+                    lines.append(f"  {year}: {cash_str} {stk_str}{pay_str}")
+        except Exception:
+            pass
+
+        # 添加股份回购数据
+        try:
+            repurchase_df = pro.repurchase(ts_code=ts_code, limit=10)
+            repurchase_df = repurchase_df[repurchase_df['ts_code'] == ts_code]
+            if not repurchase_df.empty:
+                lines.append("")
+                lines.append("# Share Repurchase History (近10次回购)")
+                for _, rp_row in repurchase_df.head(5).iterrows():
+                    ann = rp_row.get('ann_date', 'N/A')
+                    vol = rp_row.get('vol', 0)
+                    amount = rp_row.get('amount', 0)
+                    proc = rp_row.get('proc', 0)
+                    if vol and float(vol) > 0:
+                        vol_str = f"{float(vol)/10000:.2f}万股"
+                        amount_str = f"{float(amount)/10000:.2f}万元" if amount else "N/A"
+                        proc_str = f", 价格: {proc}元" if proc and float(proc) > 0 else ""
+                        lines.append(f"  公告日: {ann}, 数量: {vol_str}, 金额: {amount_str}{proc_str}")
+        except Exception:
+            pass
+
+        # 添加收入和利润同比增长率
+        try:
+            income_df = pro.income(ts_code=ts_code)
+            if not income_df.empty:
+                income_df = income_df.sort_values('end_date', ascending=False)
+                if len(income_df) >= 4:
+                    income_df['revenue_yoy'] = income_df['revenue'].pct_change(periods=4) * 100
+                    income_df['n_income_yoy'] = income_df['n_income'].pct_change(periods=4) * 100
+                lines.append("")
+                lines.append("# Income Growth Trend (近8期季度数据)")
+                lines.append("# 注意：以下数据为'年初至报告期末'累计值，非单季值，非 TTM")
+                lines.append(f"  {'报告期':<10} {'营收(亿)':>10} {'营收YOY%':>10} {'净利润(亿)':>12} {'净利润YOY%':>12}")
+                lines.append("  " + "-" * 60)
+                for _, inc_row in income_df.head(8).iterrows():
+                    period = str(inc_row.get('end_date', 'N/A'))[:6]
+                    rev = inc_row.get('revenue', 0)
+                    ni = inc_row.get('n_income', 0)
+                    rev_yoy = inc_row.get('revenue_yoy')
+                    ni_yoy = inc_row.get('n_income_yoy')
+                    rev_str = f"{float(rev)/1e8:.2f}" if rev else "N/A"
+                    ni_str = f"{float(ni)/1e8:.2f}" if ni else "N/A"
+                    rev_yoy_str = f"{float(rev_yoy):.1f}%" if rev_yoy and not pd.isna(rev_yoy) else "N/A"
+                    ni_yoy_str = f"{float(ni_yoy):.1f}%" if ni_yoy and not pd.isna(ni_yoy) else "N/A"
+                    lines.append(f"  {period:<10} {rev_str:>10} {rev_yoy_str:>10} {ni_str:>12} {ni_yoy_str:>12}")
+        except Exception:
+            pass
 
         header = f"# Company Fundamentals for {normalized_ticker}\n"
         header += f"# Data retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
@@ -396,6 +493,159 @@ def get_insider_transactions(
         f"Insider transactions data is not available via Tushare citydata mode for "
         f"'{normalized_ticker}'."
     )
+
+
+def get_dividend_data(
+    ticker: Annotated[str, "ticker symbol of the company"],
+    curr_date: Annotated[str, "current date"] = None
+):
+    """获取股票股息分红历史数据"""
+    normalized_ticker = _convert_symbol(ticker)
+    ts_code = normalized_ticker
+
+    try:
+        pro = _get_pro()
+        df = pro.dividend(ts_code=ts_code, limit=20)
+
+        if df.empty:
+            return f"No dividend data found for '{ticker}'"
+
+        lines = []
+        lines.append(f"# Dividend History for {normalized_ticker}")
+        lines.append(f"# Data source: Tushare (citydata.club proxy)\n")
+
+        # 遍历分红记录
+        for _, row in df.iterrows():
+            end_date = row.get('end_date', 'N/A')
+            ann_date = row.get('ann_date', 'N/A')
+            cash_div = row.get('cash_div', 0)  # 现金分红（税前）
+            stk_div = row.get('stk_div', 0)  # 股票分红（每10股送转）
+            pay_date = row.get('pay_date', 'N/A')
+
+            record = f"Year: {str(end_date)[:4]}, Announced: {ann_date}, "
+            record += f"Cash Dividend: {cash_div}元/股"
+            if stk_div and float(stk_div) > 0:
+                record += f", Stock Dividend: {stk_div}股/10股"
+            if pay_date and str(pay_date) != 'None':
+                record += f", Pay Date: {pay_date}"
+            lines.append(record)
+
+        return "\n".join(lines)
+
+    except Exception as e:
+        return f"Error retrieving dividend data for {ticker}: {str(e)}"
+
+
+def get_share_repurchase_data(
+    ticker: Annotated[str, "ticker symbol of the company"],
+    curr_date: Annotated[str, "current date"] = None
+):
+    """获取股票回购数据"""
+    normalized_ticker = _convert_symbol(ticker)
+    ts_code = normalized_ticker
+
+    try:
+        pro = _get_pro()
+        df = pro.repurchase(ts_code=ts_code, limit=20)
+
+        # 过滤出该股票的数据
+        df = df[df['ts_code'] == ts_code]
+
+        if df.empty:
+            return f"No share repurchase data found for '{ticker}'"
+
+        lines = []
+        lines.append(f"# Share Repurchase History for {normalized_ticker}")
+        lines.append(f"# Data source: Tushare (citydata.club proxy)\n")
+
+        for _, row in df.iterrows():
+            ann_date = row.get('ann_date', 'N/A')
+            end_date = row.get('end_date', 'N/A')
+            vol = row.get('vol', 0)  # 回购数量（股）
+            amount = row.get('amount', 0)  # 回购金额（元）
+            proc = row.get('proc', 0)  # 回购价格区间
+
+            if vol and float(vol) > 0:
+                vol_str = f"{float(vol)/10000:.2f}万股"
+            else:
+                vol_str = "N/A"
+            if amount and float(amount) > 0:
+                amount_str = f"{float(amount)/10000:.2f}万元"
+            else:
+                amount_str = "N/A"
+
+            record = f"Announced: {ann_date}, Ended: {end_date}, "
+            record += f"Volume: {vol_str}, Amount: {amount_str}"
+            if proc and float(proc) > 0:
+                record += f", Price Range: {proc}元"
+            lines.append(record)
+
+        return "\n".join(lines)
+
+    except Exception as e:
+        return f"Error retrieving repurchase data for {ticker}: {str(e)}"
+
+
+def get_income_statement_with_growth(
+    ticker: Annotated[str, "ticker symbol of the company"],
+    freq: Annotated[str, "frequency: 'annual' or 'quarterly'"] = "quarterly",
+    curr_date: Annotated[str, "current date in YYYY-MM-DD format"] = None
+):
+    """获取利润表数据，包含同比增长率"""
+    normalized_ticker = _convert_symbol(ticker)
+    ts_code = normalized_ticker
+
+    try:
+        pro = _get_pro()
+        df = pro.income(ts_code=ts_code)
+
+        if df.empty:
+            return f"No income statement data found for '{ticker}'"
+
+        # 排序
+        df = df.sort_values('end_date', ascending=False)
+
+        lines = []
+        lines.append(f"# Income Statement with Growth Rates for {normalized_ticker}")
+        lines.append(f"# Data source: Tushare (citydata.club proxy)")
+        lines.append(f"# 注意：金额单位为元，增长率单位为%\n")
+
+        # 获取列名
+        cols = df.columns.tolist()
+
+        # 计算同比增长率（针对季度数据，需要对比去年同期）
+        # 假设数据按季度排列
+        if len(df) >= 4:
+            df['revenue_yoy'] = df['revenue'].pct_change(periods=4) * 100
+            df['n_income_yoy'] = df['n_income'].pct_change(periods=4) * 100
+        else:
+            df['revenue_yoy'] = None
+            df['n_income_yoy'] = None
+
+        # 输出表头
+        header = f"{'Report Date':<12} {'Revenue':>15} {'Rev YoY%':>10} {'Net Income':>15} {'NI YoY%':>10}"
+        lines.append(header)
+        lines.append("-" * 70)
+
+        # 输出数据行
+        for _, row in df.head(12).iterrows():  # 最近12期
+            end_date = str(row.get('end_date', 'N/A'))
+            revenue = row.get('revenue', 0)
+            n_income = row.get('n_income', 0)
+            rev_yoy = row.get('revenue_yoy')
+            ni_yoy = row.get('n_income_yoy')
+
+            revenue_str = f"{float(revenue)/1e8:.2f}亿" if revenue else "N/A"
+            n_income_str = f"{float(n_income)/1e8:.2f}亿" if n_income else "N/A"
+            rev_yoy_str = f"{float(rev_yoy):.1f}%" if rev_yoy and not pd.isna(rev_yoy) else "N/A"
+            ni_yoy_str = f"{float(ni_yoy):.1f}%" if ni_yoy and not pd.isna(ni_yoy) else "N/A"
+
+            lines.append(f"{end_date:<12} {revenue_str:>15} {rev_yoy_str:>10} {n_income_str:>15} {ni_yoy_str:>10}")
+
+        return "\n".join(lines)
+
+    except Exception as e:
+        return f"Error retrieving income statement for {ticker}: {str(e)}"
 
 
 def get_news(

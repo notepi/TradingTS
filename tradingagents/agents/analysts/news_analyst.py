@@ -3,9 +3,11 @@ import time
 import json
 from tradingagents.agents.utils.agent_utils import (
     build_instrument_context,
-    get_global_news,
+    get_company_industry,
     get_language_instruction,
-    get_news,
+)
+from tradingagents.agents.utils.news_data_tools import (
+    research_macro_news,
 )
 from tradingagents.dataflows.config import get_config
 
@@ -13,16 +15,36 @@ from tradingagents.dataflows.config import get_config
 def create_news_analyst(llm):
     def news_analyst_node(state):
         current_date = state["trade_date"]
-        instrument_context = build_instrument_context(state["company_of_interest"])
+        ticker = state["company_of_interest"]
+        instrument_context = build_instrument_context(ticker)
+
+        # Resolve industry for targeted macro research
+        industry = get_company_industry(ticker)
 
         tools = [
-            get_news,
-            get_global_news,
+            research_macro_news,
         ]
 
         system_message = (
-            "You are a news researcher tasked with analyzing recent news and trends over the past week. Please write a comprehensive report of the current state of the world that is relevant for trading and macroeconomics. Use the available tools: get_news(query, start_date, end_date) for company-specific or targeted news searches, and get_global_news(curr_date, look_back_days, limit) for broader macroeconomic news. Provide specific, actionable insights with supporting evidence to help traders make informed decisions."
+            "You are a news researcher tasked with analyzing macro factors that affect a specific company. "
+            "Your goal is to identify macro variables and explain HOW they transmit to THIS company, not write a generic global macro report.\n\n"
+            "IMPORTANT: Use the research_macro_news(ticker, industry, start_date, end_date, look_back_days) tool FIRST to get structured macro transmission analysis. "
+            "This tool returns JSON containing:\n"
+            "- transmission_channels: each with channel name, mechanism, and specific impact_on_company\n"
+            "- macro_verdict: overall assessment\n"
+            "- key_watch: specific items to monitor\n\n"
+            "After receiving the JSON output, write a company-specific macro analysis report that:\n"
+            "1. Lists the key macro variables found (e.g. interest rates, raw material prices, defense budget)\n"
+            "2. For EACH macro variable, explains the transmission channel to the company with SPECIFIC numbers when available\n"
+            "3. Provides a clear macro verdict on how these factors collectively affect the company\n"
+            "4. Lists actionable watch items for traders\n\n"
+            "CRITICAL FORMATTING RULE: "
+            "Each macro variable section must end with a line: '→ 对[公司名]的影响：[具体传导结论]' "
+            "Do NOT write paragraphs that don't connect to the specific company. "
+            "If a macro point doesn't have a clear transmission to this company, either find the connection or note it as 'indirect/unclear'.\n\n"
+            "Provide specific, actionable insights with supporting evidence to help traders make informed decisions."
             + """ Make sure to append a Markdown table at the end of the report to organize key points in the report, organized and easy to read."""
+            + f"\n\nCompany context: ticker={ticker}, industry={industry or 'unknown'}"
             + get_language_instruction()
         )
 

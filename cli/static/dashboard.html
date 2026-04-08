@@ -441,6 +441,37 @@
       overflow: auto;
     }
 
+    .copy-btn-container {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 8px;
+    }
+
+    .copy-btn {
+      background: rgba(29, 42, 36, 0.06);
+      border: 1px solid rgba(29, 42, 36, 0.12);
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 13px;
+      cursor: pointer;
+      color: #1a2a24;
+      transition: all 0.15s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .copy-btn:hover {
+      background: rgba(29, 42, 36, 0.1);
+      border-color: rgba(29, 42, 36, 0.2);
+    }
+
+    .copy-btn.copied {
+      background: rgba(34, 197, 94, 0.15);
+      border-color: rgba(34, 197, 94, 0.3);
+      color: #15803d;
+    }
+
     .current-speech-card {
       border-radius: 18px;
       background: linear-gradient(135deg, rgba(255, 244, 224, 0.78), rgba(228, 248, 243, 0.82));
@@ -1010,6 +1041,9 @@
                 </div>
               </summary>
               <div class="fold-body">
+                <div class="copy-btn-container">
+                  <button class="copy-btn" onclick="copyText('current-focus-content', this)">复制</button>
+                </div>
                 <div class="current-speech-card">
                   <pre id="current-focus-content" class="empty">当前还没有可展示的发言内容。</pre>
                 </div>
@@ -1042,6 +1076,9 @@
                 </div>
               </summary>
               <div class="fold-body">
+                <div class="copy-btn-container">
+                  <button class="copy-btn" onclick="copyText('current-report', this)">复制</button>
+                </div>
                 <div class="report-box">
                   <pre id="current-report" class="empty">等待新的报告片段...</pre>
                 </div>
@@ -1095,6 +1132,9 @@
               </summary>
               <div class="fold-body">
                 <div class="result-summary" id="result-summary"></div>
+                <div class="copy-btn-container">
+                  <button class="copy-btn" onclick="copyText('summary-preview', this)">复制</button>
+                </div>
                 <div class="summary-preview">
                   <pre id="summary-preview" class="empty">点上面的标签后，这里显示对应报告内容。</pre>
                 </div>
@@ -1111,6 +1151,9 @@
                 </div>
               </summary>
               <div class="fold-body">
+                <div class="copy-btn-container">
+                  <button class="copy-btn" onclick="copyText('final-report', this)">复制</button>
+                </div>
                 <div class="report-box large">
                   <pre id="final-report" class="empty">分析完成后，这里会显示整合后的完整报告。</pre>
                 </div>
@@ -1139,6 +1182,49 @@
   </div>
 
   <script>
+    function copyText(elementId, btn) {
+      const el = document.getElementById(elementId);
+      if (!el) return;
+      const text = el.innerText || el.textContent || "";
+      navigator.clipboard.writeText(text).then(() => {
+        btn.textContent = "已复制";
+        btn.classList.add("copied");
+        setTimeout(() => {
+          btn.textContent = "复制";
+          btn.classList.remove("copied");
+        }, 1500);
+      }).catch(() => {
+        btn.textContent = "复制失败";
+        setTimeout(() => {
+          btn.textContent = "复制";
+        }, 1500);
+      });
+    }
+
+    function copyTimelineContent(btn, eventId) {
+      const pre = document.getElementById(`timeline-content-${eventId}`);
+      if (!pre) {
+        console.error(`Element not found: timeline-content-${eventId}`);
+        btn.textContent = "复制失败";
+        return;
+      }
+      const text = pre.innerText || pre.textContent || "";
+      navigator.clipboard.writeText(text).then(() => {
+        btn.textContent = "已复制";
+        btn.classList.add("copied");
+        setTimeout(() => {
+          btn.textContent = "复制";
+          btn.classList.remove("copied");
+        }, 1500);
+      }).catch((err) => {
+        console.error("Clipboard error:", err);
+        btn.textContent = "复制失败";
+        setTimeout(() => {
+          btn.textContent = "复制";
+        }, 1500);
+      });
+    }
+
     const expandedStorageKey = "tradingagents_dashboard_expanded";
 
     const DASHBOARD_DEFAULT_OUTPUT_LANGUAGE = "Chinese";
@@ -2046,17 +2132,18 @@
                                   >
                                     <summary>
                                       <div class="event-summary">
-                                        <div>
+                                        <div class="event-summary-left">
                                           <div class="event-meta">
                                             <span class="event-type ${escapeHtml(event.type)}">${escapeHtml(event.type)}</span>
                                             <span class="muted">${escapeHtml(event.label)}</span>
                                           </div>
                                           <div class="muted" style="margin-top:4px;">${escapeHtml(event.timestamp)}</div>
                                         </div>
+                                        <button class="copy-btn" onclick="copyTimelineContent(this, ${JSON.stringify(String(event.id))})">复制</button>
                                       </div>
                                     </summary>
                                     <div class="event-body">
-                                      <pre>${escapeHtml(event.content)}</pre>
+                                      <pre id="timeline-content-${String(event.id)}">${escapeHtml(event.content)}</pre>
                                     </div>
                                   </details>
                                 `)
@@ -2150,8 +2237,11 @@
                 </div>
               </summary>
               <div class="timeline-body">
+                <div class="copy-btn-container">
+                  <button class="copy-btn" onclick="copyTimelineContent(this, ${JSON.stringify(String(event.id))})">复制</button>
+                </div>
                 <div class="timeline-content">
-                  <pre>${escapeHtml(event.content || "")}</pre>
+                  <pre id="timeline-content-${String(event.id)}">${escapeHtml(event.content || "")}</pre>
                 </div>
               </div>
             </details>

@@ -1,7 +1,8 @@
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 import time
 import json
-from tradingagents.agents.utils.agent_utils import build_instrument_context, get_language_instruction, get_news
+from tradingagents.agents.utils.agent_utils import build_instrument_context, get_language_instruction
+from tradingagents.agents.utils.news_data_tools import research_company_news
 from tradingagents.dataflows.config import get_config
 
 
@@ -11,12 +12,34 @@ def create_social_media_analyst(llm):
         instrument_context = build_instrument_context(state["company_of_interest"])
 
         tools = [
-            get_news,
+            research_company_news,
         ]
 
         system_message = (
-            "You are a social media and company specific news researcher/analyst tasked with analyzing social media posts, recent company news, and public sentiment for a specific company over the past week. You will be given a company's name your objective is to write a comprehensive long report detailing your analysis, insights, and implications for traders and investors on this company's current state after looking at social media and what people are saying about that company, analyzing sentiment data of what people feel each day about the company, and looking at recent company news. Use the get_news(query, start_date, end_date) tool to search for company-specific news and social media discussions. Try to look at all sources possible from social media to sentiment to news. Provide specific, actionable insights with supporting evidence to help traders make informed decisions."
-            + """ Make sure to append a Markdown table at the end of the report to organize key points in the report, organized and easy to read."""
+            "You are a stock news and sentiment analyst. Your task is to analyze company news and public sentiment.\n\n"
+            "IMPORTANT: Use the research_company_news(ticker, start_date, end_date, look_back_days) tool first to "
+            "get structured news data. This tool performs comprehensive multi-bucket search across:\n"
+            "- official_disclosure (announcements)\n"
+            "- mainstream_news (general news)\n"
+            "- sector_context (industry news)\n"
+            "- public_discussion (social media)\n"
+            "- negative_risk (risk events)\n"
+            "- positive_news (positive events)\n\n"
+            "After receiving the structured JSON output, analyze the evidence items and write a comprehensive report.\n\n"
+            "Your analysis should:\n"
+            "1. Summarize the major findings from high-confidence sources\n"
+            "2. Distinguish between confirmed facts, media interpretation, and speculation\n"
+            "3. Identify key risk signals and positive drivers\n"
+            "4. Assess overall sentiment and its implications for traders\n\n"
+            "Provide specific, actionable insights with supporting evidence to help traders make informed decisions.\n\n"
+            "IMPORTANT - 分析范围约束：\n"
+            "- 你的职责是分析公司新闻和公众情绪，不是技术分析\n"
+            "- 禁止在报告中包含：股价涨跌幅计算、最大回撤、夏普比率等技术指标\n"
+            "- 如需引用市场数据，只引用 news_report 或 market_report 中已有的内容，不要自行计算或编造数字\n"
+            "- 市场/技术分析属于 market_analyst 的职责，你的报告应聚焦于：\n"
+            "  * 重大新闻事件识别和解读\n"
+            "  * 公众/机构情绪评估\n"
+            "  * 舆情风险信号\n\n"
             + get_language_instruction()
         )
 

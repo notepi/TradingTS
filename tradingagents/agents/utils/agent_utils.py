@@ -42,6 +42,28 @@ def build_instrument_context(ticker: str) -> str:
         "preserving any exchange suffix (e.g. `.TO`, `.L`, `.HK`, `.T`)."
     )
 
+
+def get_company_industry(ticker: str) -> str:
+    """Get company industry from ticker using tushare data.
+
+    Args:
+        ticker: Stock ticker (e.g. "688333.SH")
+
+    Returns:
+        Industry name (e.g. "机械设备") or empty string if not available
+    """
+    try:
+        from tradingagents.dataflows.tushare_data import _get_pro, _convert_symbol
+        ts_code = _convert_symbol(ticker)
+        pro = _get_pro()
+        all_basic = pro.stock_basic()
+        basic = all_basic[all_basic['ts_code'] == ts_code]
+        if not basic.empty:
+            return basic.iloc[0].get('industry', '')
+    except Exception:
+        pass
+    return ''
+
 def create_msg_delete():
     def delete_messages(state):
         """Clear messages and add placeholder for Anthropic compatibility"""
