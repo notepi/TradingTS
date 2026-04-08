@@ -89,6 +89,7 @@ RUNTIME_AGENT_FILE_MAP = {
     "Fundamentals Analyst": Path("1_analysts/fundamentals.md"),
     "Bull Researcher": Path("2_research/bull.md"),
     "Bear Researcher": Path("2_research/bear.md"),
+    "Peter Lynch Researcher": Path("2_research/peter_lynch.md"),
     "Research Manager": Path("2_research/manager.md"),
     "Trader": Path("3_trading/trader.md"),
     "Aggressive Analyst": Path("4_risk/aggressive.md"),
@@ -99,6 +100,7 @@ RUNTIME_AGENT_FILE_MAP = {
 RUNTIME_AGENT_EVENT_HEADINGS = {
     "Bull Researcher": "### Bull Researcher Analysis",
     "Bear Researcher": "### Bear Researcher Analysis",
+    "Peter Lynch Researcher": "### Peter Lynch Researcher Analysis",
     "Research Manager": "### Research Manager Decision",
     "Aggressive Analyst": "### Aggressive Analyst Analysis",
     "Conservative Analyst": "### Conservative Analyst Analysis",
@@ -113,6 +115,7 @@ RUNTIME_SECTION_MEMBERS = {
     "investment_plan": [
         ("Bull Researcher", "### Bull Researcher Analysis"),
         ("Bear Researcher", "### Bear Researcher Analysis"),
+        ("Peter Lynch Researcher", "### Peter Lynch Researcher Analysis"),
         ("Research Manager", "### Research Manager Decision"),
     ],
     "trader_investment_plan": [("Trader", None)],

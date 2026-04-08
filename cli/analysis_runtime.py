@@ -39,7 +39,7 @@ WORKFLOW_STAGE_DEFS = [
     (
         "research",
         "Research Team",
-        ["Bull Researcher", "Bear Researcher", "Research Manager"],
+        ["Bull Researcher", "Bear Researcher", "Peter Lynch Researcher", "Research Manager"],
     ),
     ("trading", "Trading Team", ["Trader"]),
     (
@@ -57,6 +57,7 @@ AGENT_STAGE_MAP = {
     "Fundamentals Analyst": "analysts",
     "Bull Researcher": "research",
     "Bear Researcher": "research",
+    "Peter Lynch Researcher": "research",
     "Research Manager": "research",
     "Trader": "trading",
     "Aggressive Analyst": "risk",
@@ -68,7 +69,7 @@ AGENT_STAGE_MAP = {
 
 class AnalysisBuffer:
     FIXED_AGENTS = {
-        "Research Team": ["Bull Researcher", "Bear Researcher", "Research Manager"],
+        "Research Team": ["Bull Researcher", "Bear Researcher", "Peter Lynch Researcher", "Research Manager"],
         "Trading Team": ["Trader"],
         "Risk Management": [
             "Aggressive Analyst",
@@ -472,7 +473,7 @@ def pick_current_focus_event(
 
 def infer_agent_for_section(section_name: str, content: str) -> str:
     if section_name == "investment_plan":
-        for agent in ["Bull Researcher", "Bear Researcher", "Research Manager"]:
+        for agent in ["Bull Researcher", "Bear Researcher", "Peter Lynch Researcher", "Research Manager"]:
             if agent in content:
                 return agent
         return "Research Manager"
@@ -501,7 +502,7 @@ def infer_agent_for_section(section_name: str, content: str) -> str:
 
 
 def update_research_team_status(buffer: AnalysisBuffer, status: str) -> None:
-    for agent in ["Bull Researcher", "Bear Researcher", "Research Manager"]:
+    for agent in ["Bull Researcher", "Bear Researcher", "Peter Lynch Researcher", "Research Manager"]:
         buffer.update_agent_status(agent, status)
 
 
