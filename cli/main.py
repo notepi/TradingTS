@@ -689,6 +689,10 @@ def save_report_to_disk(final_state, ticker: str, save_path: Path):
             research_dir.mkdir(exist_ok=True)
             (research_dir / "bear.md").write_text(debate["bear_history"])
             research_parts.append(("Bear Researcher", debate["bear_history"]))
+        if debate.get("peter_lynch_history"):
+            research_dir.mkdir(exist_ok=True)
+            (research_dir / "peter_lynch.md").write_text(debate["peter_lynch_history"])
+            research_parts.append(("Peter Lynch Researcher", debate["peter_lynch_history"]))
         if debate.get("judge_decision"):
             research_dir.mkdir(exist_ok=True)
             (research_dir / "manager.md").write_text(debate["judge_decision"])
@@ -766,6 +770,8 @@ def display_complete_report(final_state):
             research.append(("Bull Researcher", debate["bull_history"]))
         if debate.get("bear_history"):
             research.append(("Bear Researcher", debate["bear_history"]))
+        if debate.get("peter_lynch_history"):
+            research.append(("Peter Lynch Researcher", debate["peter_lynch_history"]))
         if debate.get("judge_decision"):
             research.append(("Research Manager", debate["judge_decision"]))
         if research:

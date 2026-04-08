@@ -38,6 +38,7 @@ INDIVIDUAL_REPORT_EVENTS = [
     ("fundamentals_report", "Fundamentals Analyst", "1_analysts/fundamentals.md", None),
     ("investment_plan", "Bull Researcher", "2_research/bull.md", "### Bull Researcher Analysis"),
     ("investment_plan", "Bear Researcher", "2_research/bear.md", "### Bear Researcher Analysis"),
+    ("investment_plan", "Peter Lynch Researcher", "2_research/peter_lynch.md", "### Peter Lynch Researcher Analysis"),
     ("investment_plan", "Research Manager", "2_research/manager.md", "### Research Manager Decision"),
     ("trader_investment_plan", "Trader", "3_trading/trader.md", None),
     ("final_trade_decision", "Aggressive Analyst", "4_risk/aggressive.md", "### Aggressive Analyst Analysis"),
@@ -331,6 +332,7 @@ def _load_report_sections(run_dir: Path, language: str | None = None) -> dict[st
         [
             ("### Bull Researcher Analysis", run_dir / "2_research/bull.md"),
             ("### Bear Researcher Analysis", run_dir / "2_research/bear.md"),
+            ("### Peter Lynch Researcher Analysis", run_dir / "2_research/peter_lynch.md"),
             ("### Research Manager Decision", run_dir / "2_research/manager.md"),
         ],
         language,
@@ -478,6 +480,8 @@ def _infer_agent_from_log(label: str, content: str) -> str:
         return "Bull Researcher"
     if "bear analyst" in text or "bear researcher" in text:
         return "Bear Researcher"
+    if "peter lynch analyst" in text or "peter lynch researcher" in text:
+        return "Peter Lynch Researcher"
     if "research manager" in text or "summary of the debate" in text:
         return "Research Manager"
     if "aggressive analyst" in text:

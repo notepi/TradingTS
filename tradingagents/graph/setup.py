@@ -21,6 +21,7 @@ class GraphSetup:
         tool_nodes: Dict[str, ToolNode],
         bull_memory,
         bear_memory,
+        peter_lynch_memory,
         trader_memory,
         invest_judge_memory,
         portfolio_manager_memory,
@@ -32,6 +33,7 @@ class GraphSetup:
         self.tool_nodes = tool_nodes
         self.bull_memory = bull_memory
         self.bear_memory = bear_memory
+        self.peter_lynch_memory = peter_lynch_memory
         self.trader_memory = trader_memory
         self.invest_judge_memory = invest_judge_memory
         self.portfolio_manager_memory = portfolio_manager_memory
@@ -92,6 +94,9 @@ class GraphSetup:
         bear_researcher_node = create_bear_researcher(
             self.quick_thinking_llm, self.bear_memory
         )
+        peter_lynch_researcher_node = create_peter_lynch_researcher(
+            self.quick_thinking_llm, self.peter_lynch_memory
+        )
         research_manager_node = create_research_manager(
             self.deep_thinking_llm, self.invest_judge_memory
         )
@@ -119,6 +124,7 @@ class GraphSetup:
         # Add other nodes
         workflow.add_node("Bull Researcher", bull_researcher_node)
         workflow.add_node("Bear Researcher", bear_researcher_node)
+        workflow.add_node("Peter Lynch Researcher", peter_lynch_researcher_node)
         workflow.add_node("Research Manager", research_manager_node)
         workflow.add_node("Trader", trader_node)
         workflow.add_node("Aggressive Analyst", aggressive_analyst)
@@ -158,11 +164,21 @@ class GraphSetup:
             self.conditional_logic.should_continue_debate,
             {
                 "Bear Researcher": "Bear Researcher",
+                "Peter Lynch Researcher": "Peter Lynch Researcher",
                 "Research Manager": "Research Manager",
             },
         )
         workflow.add_conditional_edges(
             "Bear Researcher",
+            self.conditional_logic.should_continue_debate,
+            {
+                "Bull Researcher": "Bull Researcher",
+                "Peter Lynch Researcher": "Peter Lynch Researcher",
+                "Research Manager": "Research Manager",
+            },
+        )
+        workflow.add_conditional_edges(
+            "Peter Lynch Researcher",
             self.conditional_logic.should_continue_debate,
             {
                 "Bull Researcher": "Bull Researcher",

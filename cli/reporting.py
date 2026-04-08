@@ -58,6 +58,12 @@ def save_report_to_disk(final_state: Dict[str, Any], ticker: str, save_path: Pat
                 debate["bear_history"], encoding="utf-8"
             )
             research_parts.append(("Bear Researcher", debate["bear_history"]))
+        if debate.get("peter_lynch_history"):
+            research_dir.mkdir(exist_ok=True)
+            (research_dir / "peter_lynch.md").write_text(
+                debate["peter_lynch_history"], encoding="utf-8"
+            )
+            research_parts.append(("Peter Lynch Researcher", debate["peter_lynch_history"]))
         if debate.get("judge_decision"):
             research_dir.mkdir(exist_ok=True)
             (research_dir / "manager.md").write_text(

@@ -90,6 +90,16 @@ Adhere strictly to these instructions, and ensure your output is detailed, accur
         )
         bear_memory.add_situations([(situation, result)])
 
+    def reflect_peter_lynch_researcher(self, current_state, returns_losses, peter_lynch_memory):
+        """Reflect on Peter Lynch researcher's analysis and update memory."""
+        situation = self._extract_current_situation(current_state)
+        peter_lynch_debate_history = current_state["investment_debate_state"]["peter_lynch_history"]
+
+        result = self._reflect_on_component(
+            "PETER LYNCH", peter_lynch_debate_history, situation, returns_losses
+        )
+        peter_lynch_memory.add_situations([(situation, result)])
+
     def reflect_trader(self, current_state, returns_losses, trader_memory):
         """Reflect on trader's decision and update memory."""
         situation = self._extract_current_situation(current_state)

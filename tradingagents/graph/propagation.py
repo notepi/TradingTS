@@ -27,6 +27,7 @@ class Propagator:
                 {
                     "bull_history": "",
                     "bear_history": "",
+                    "peter_lynch_history": "",
                     "history": "",
                     "current_response": "",
                     "judge_decision": "",

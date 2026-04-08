@@ -415,6 +415,7 @@ class DashboardRuntimeTests(unittest.TestCase):
                     "investment_debate_state": {
                         "bull_history": "Bull round 1",
                         "bear_history": "",
+                        "peter_lynch_history": "",
                         "judge_decision": "",
                     }
                 },
@@ -437,6 +438,7 @@ class DashboardRuntimeTests(unittest.TestCase):
                     "investment_debate_state": {
                         "bull_history": "Bull final",
                         "bear_history": "Bear final",
+                        "peter_lynch_history": "Peter Lynch final",
                         "judge_decision": "Manager final",
                     }
                 },
@@ -449,6 +451,7 @@ class DashboardRuntimeTests(unittest.TestCase):
 
             self.assertEqual((run_dir / "2_research" / "bull.md").read_text(encoding="utf-8"), "Bull final")
             self.assertEqual((run_dir / "2_research" / "bear.md").read_text(encoding="utf-8"), "Bear final")
+            self.assertEqual((run_dir / "2_research" / "peter_lynch.md").read_text(encoding="utf-8"), "Peter Lynch final")
             self.assertEqual((run_dir / "2_research" / "manager.md").read_text(encoding="utf-8"), "Manager final")
             self.assertEqual(translated_bull.read_text(encoding="utf-8"), "ZH:Bull final")
 

@@ -783,10 +783,13 @@ class DashboardSession:
         if judge:
             bull_hist = str(debate_state.get("bull_history") or "").strip()
             bear_hist = str(debate_state.get("bear_history") or "").strip()
+            peter_lynch_hist = str(debate_state.get("peter_lynch_history") or "").strip()
             if bull_hist:
                 member_outputs.append(("Bull Researcher", bull_hist))
             if bear_hist:
                 member_outputs.append(("Bear Researcher", bear_hist))
+            if peter_lynch_hist:
+                member_outputs.append(("Peter Lynch Researcher", peter_lynch_hist))
             member_outputs.append(("Research Manager", judge))
 
         risk_state = chunk.get("risk_debate_state") or {}

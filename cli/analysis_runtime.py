@@ -621,9 +621,10 @@ def apply_stream_chunk(buffer: AnalysisBuffer, chunk: Dict[str, Any]) -> None:
         debate_state = chunk["investment_debate_state"]
         bull_hist = debate_state.get("bull_history", "").strip()
         bear_hist = debate_state.get("bear_history", "").strip()
+        peter_lynch_hist = debate_state.get("peter_lynch_history", "").strip()
         judge = debate_state.get("judge_decision", "").strip()
 
-        if bull_hist or bear_hist:
+        if bull_hist or bear_hist or peter_lynch_hist:
             update_research_team_status(buffer, "in_progress")
         if bull_hist:
             buffer.update_report_section(
@@ -632,6 +633,10 @@ def apply_stream_chunk(buffer: AnalysisBuffer, chunk: Dict[str, Any]) -> None:
         if bear_hist:
             buffer.update_report_section(
                 "investment_plan", f"### Bear Researcher Analysis\n{bear_hist}"
+            )
+        if peter_lynch_hist:
+            buffer.update_report_section(
+                "investment_plan", f"### Peter Lynch Researcher Analysis\n{peter_lynch_hist}"
             )
         if judge:
             buffer.update_report_section(
