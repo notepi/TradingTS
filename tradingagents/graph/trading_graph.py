@@ -30,7 +30,9 @@ from tradingagents.agents.utils.agent_utils import (
     get_income_statement,
     get_news,
     get_insider_transactions,
-    get_global_news
+    get_global_news,
+    research_company_news,
+    research_macro_news,
 )
 
 from .conditional_logic import ConditionalLogic
@@ -171,15 +173,13 @@ class TradingAgentsGraph:
             "social": ToolNode(
                 [
                     # News tools for social media analysis
-                    get_news,
+                    research_company_news,
                 ]
             ),
             "news": ToolNode(
                 [
-                    # News and insider information
-                    get_news,
-                    get_global_news,
-                    get_insider_transactions,
+                    # News and macro research tools
+                    research_macro_news,
                 ]
             ),
             "fundamentals": ToolNode(

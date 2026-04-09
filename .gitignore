@@ -220,6 +220,6 @@ __marimo__/
 
 # Project specific
 eval_results/
-srcMO/
+
 .DS_Store
 .claude/
