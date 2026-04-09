@@ -876,9 +876,13 @@ def build_macro_transmission_output(
         key_findings = []
         for art in arts[:2]:
             title = art.get("title", "")
+            published_date = art.get("published_date", "")
             content = (art.get("content_summary", "") or "")[:200]
             if title:
-                key_findings.append(f"- {title}")
+                if published_date:
+                    key_findings.append(f"- {title} ({published_date})")
+                else:
+                    key_findings.append(f"- {title}")
 
         # Build impact on company
         impact = _build_impact_statement(
