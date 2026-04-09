@@ -5,6 +5,8 @@ import json
 
 def create_bull_researcher(llm, memory):
     def bull_node(state) -> dict:
+        current_date = state["trade_date"]
+
         investment_debate_state = state["investment_debate_state"]
         history = investment_debate_state.get("history", "")
         bull_history = investment_debate_state.get("bull_history", "")
@@ -31,6 +33,15 @@ Key points to focus on:
 - Bear Counterpoints: Critically analyze the bear argument with specific data and sound reasoning, addressing concerns thoroughly and showing why the bull perspective holds stronger merit.
 - Engagement: Present your argument in a conversational style, engaging directly with the bear analyst's points and debating effectively rather than just listing data.
 
+IMPORTANT - 时间上下文（今日是 {current_date}）：
+- 你正在分析截至 {current_date} 的信息
+- 在引用新闻事件时，必须评估其时效性：
+  - 近7天内发布：时效性强，可作为核心论据
+  - 14天内发布：时效性中等，适度引用
+  - 30天以上：时效性弱，仅作背景参考，必须标注为"历史信息"
+- 严禁将旧新闻（超过30天）当作最新事件或重要论据引用
+- 引用新闻时应标注"根据XX月XX日的报道..."或"近期（近7天）XX报道显示..."
+
 IMPORTANT - 数字准确性约束：
 - 严禁编造或夸大任何财务数据
 - 引用数字时必须使用 fundamentals_report 中的原始数据
@@ -45,6 +56,9 @@ Company fundamentals report: {fundamentals_report}
 Conversation history of the debate: {history}
 Last bear argument: {current_response}
 Reflections from similar situations and lessons learned: {past_memory_str}
+
+今日分析日期: {current_date}
+
 Use this information to deliver a compelling bull argument, refute the bear's concerns, and engage in a dynamic debate that demonstrates the strengths of the bull position. You must also address reflections and learn from lessons and mistakes you made in the past.
 """
 

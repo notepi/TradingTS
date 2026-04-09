@@ -5,6 +5,8 @@ import json
 
 def create_peter_lynch_researcher(llm, memory):
     def peter_lynch_node(state) -> dict:
+        current_date = state["trade_date"]
+
         investment_debate_state = state["investment_debate_state"]
         history = investment_debate_state.get("history", "")
         peter_lynch_history = investment_debate_state.get("peter_lynch_history", "")
@@ -43,6 +45,15 @@ Key Analysis Points:
 - Dividend/Share Buybacks: Check Dividend History and Share Repurchase sections - management confidence signals.
 - 13 Lynch Criteria: boring name, boring business, institutional neglect, etc.
 
+IMPORTANT - 时间上下文（今日是 {current_date}）：
+- 你正在分析截至 {current_date} 的信息
+- 在引用新闻事件时，必须评估其时效性：
+  - 近7天内发布：时效性强，可作为核心论据
+  - 14天内发布：时效性中等，适度引用
+  - 30天以上：时效性弱，仅作背景参考，必须标注为"历史信息"
+- 严禁将旧新闻（超过30天）当作最新事件或重要论据引用
+- 引用新闻时应标注"根据XX月XX日的报道..."或"近期（近7天）XX报道显示..."
+
 IMPORTANT - Data to Use:
 - Stock Price, P/E (TTM), P/B Ratio, Market Cap: from fundamentals report header section
 - Revenue YoY%, Net Income YoY%: from "Income Growth Trend" table - use the YoY columns
@@ -64,6 +75,8 @@ Company fundamentals report: {fundamentals_report}
 Conversation history of the debate: {history}
 Last argument from other analysts: {current_response}
 Reflections from similar situations and lessons learned: {past_memory_str}
+
+今日分析日期: {current_date}
 
 Output Format:
 1. First, classify this stock into one of the 6 types with justification

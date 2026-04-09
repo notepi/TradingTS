@@ -5,6 +5,8 @@ import json
 
 def create_bear_researcher(llm, memory):
     def bear_node(state) -> dict:
+        current_date = state["trade_date"]
+
         investment_debate_state = state["investment_debate_state"]
         history = investment_debate_state.get("history", "")
         bear_history = investment_debate_state.get("bear_history", "")
@@ -32,6 +34,21 @@ Key points to focus on:
 - Bull Counterpoints: Critically analyze the bull argument with specific data and sound reasoning, exposing weaknesses or over-optimistic assumptions.
 - Engagement: Present your argument in a conversational style, directly engaging with the bull analyst's points and debating effectively rather than simply listing facts.
 
+IMPORTANT - 时间上下文（今日是 {current_date}）：
+- 你正在分析截至 {current_date} 的信息
+- 在引用新闻事件时，必须评估其时效性：
+  - 近7天内发布：时效性强，可作为核心论据
+  - 14天内发布：时效性中等，适度引用
+  - 30天以上：时效性弱，仅作背景参考，必须标注为"历史信息"
+- 严禁将旧新闻（超过30天）当作最新事件或重要论据引用
+- 引用新闻时应标注"根据XX月XX日的报道..."或"近期（近7天）XX报道显示..."
+
+IMPORTANT - 数字准确性约束：
+- 严禁编造或夸大任何财务数据
+- 引用数字时必须使用 fundamentals_report 中的原始数据
+- 如果报告中的数据不完整或不清晰，明确说明"数据不足，无法确认"
+- 所有百分比、数字必须与源报告一致
+
 Resources available:
 
 Market research report: {market_research_report}
@@ -42,11 +59,7 @@ Conversation history of the debate: {history}
 Last bull argument: {current_response}
 Reflections from similar situations and lessons learned: {past_memory_str}
 
-IMPORTANT - 数字准确性约束：
-- 严禁编造或夸大任何财务数据
-- 引用数字时必须使用 fundamentals_report 中的原始数据
-- 如果报告中的数据不完整或不清晰，明确说明"数据不足，无法确认"
-- 所有百分比、数字必须与源报告一致
+今日分析日期: {current_date}
 
 Use this information to deliver a compelling bear argument, refute the bull's claims, and engage in a dynamic debate that demonstrates the risks and weaknesses of investing in the stock. You must also address reflections and learn from lessons and mistakes you made in the past.
 """
