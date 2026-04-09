@@ -50,6 +50,12 @@ IMPORTANT - Data to Use:
 - Share Repurchases: from "Share Repurchase History" section - shows if company is buying back shares
 - ROE, Net Profit Margin, Gross Margin: use for business quality assessment
 
+IMPORTANT - 数字准确性约束：
+- 严禁编造或夸大任何财务数据
+- 引用数字时必须使用 fundamentals_report 中的原始数据
+- 如果报告中的数据不完整或不清晰，明确说明"数据不足，无法确认"
+- 所有百分比、数字必须与源报告一致
+
 Resources available:
 Market research report: {market_research_report}
 Social media sentiment report: {sentiment_report}

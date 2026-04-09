@@ -24,6 +24,12 @@ def create_aggressive_debator(llm):
 
 Your task is to create a compelling case for the trader's decision by questioning and critiquing the conservative and neutral stances to demonstrate why your high-reward perspective offers the best path forward. Incorporate insights from the following sources into your arguments:
 
+IMPORTANT - 数字准确性约束：
+- 严禁编造或夸大任何财务数据
+- 引用数字时必须使用 fundamentals_report 中的原始数据
+- 如果报告中的数据不完整或不清晰，明确说明"数据不足，无法确认"
+- 所有百分比、数字必须与源报告一致
+
 Market Research Report: {market_research_report}
 Social Media Sentiment Report: {sentiment_report}
 Latest World Affairs Report: {news_report}

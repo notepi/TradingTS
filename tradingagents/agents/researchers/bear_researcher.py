@@ -41,6 +41,13 @@ Company fundamentals report: {fundamentals_report}
 Conversation history of the debate: {history}
 Last bull argument: {current_response}
 Reflections from similar situations and lessons learned: {past_memory_str}
+
+IMPORTANT - 数字准确性约束：
+- 严禁编造或夸大任何财务数据
+- 引用数字时必须使用 fundamentals_report 中的原始数据
+- 如果报告中的数据不完整或不清晰，明确说明"数据不足，无法确认"
+- 所有百分比、数字必须与源报告一致
+
 Use this information to deliver a compelling bear argument, refute the bull's claims, and engage in a dynamic debate that demonstrates the risks and weaknesses of investing in the stock. You must also address reflections and learn from lessons and mistakes you made in the past.
 """
 

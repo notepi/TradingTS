@@ -45,6 +45,15 @@ def create_news_analyst(llm):
             "Provide specific, actionable insights with supporting evidence to help traders make informed decisions."
             + """ Make sure to append a Markdown table at the end of the report to organize key points in the report, organized and easy to read."""
             + f"\n\nCompany context: ticker={ticker}, industry={industry or 'unknown'}"
+            + "\n\nIMPORTANT - 分析范围约束："
+            + "\n- 你的职责是分析宏观变量对公司的传导，不是行业或公司基本面分析"
+            + "\n- 禁止在报告中包含：详细的公司财务数据解读、股价预测等"
+            + "\n- 聚焦于：宏观变量识别、传导通道分析、对公司的具体影响"
+            + "\n\nIMPORTANT - 数字准确性约束："
+            + "\n- 严禁编造或夸大任何数据"
+            + "\n- 引用数字时必须使用 research_macro_news 工具返回的原始数据"
+            + "\n- 如果数据不完整或不清晰，明确说明'数据不足，无法确认'"
+            + "\n- 所有百分比、数字必须与源数据一致"
             + get_language_instruction()
         )
 
