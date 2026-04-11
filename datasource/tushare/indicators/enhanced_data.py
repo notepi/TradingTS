@@ -7,6 +7,7 @@ Tushare 数据接口 - 使用 citydata.club 代理
 from typing import Annotated
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
+import logging
 import pandas as pd
 import os
 
@@ -87,8 +88,8 @@ def get_Tushare_data_online(
         header = f"# Stock data for {normalized_symbol} from {start_date} to {end_date}\n"
         header += f"# Total records: {len(df)}\n"
         header += f"# Data retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-        header += f"# Data source: Tushare (citydata.club proxy)\n"
-        header += f"# 注意：Volume 单位为手(每手100股)，Amount 单位为千元\n\n"
+        header += "# Data source: Tushare (citydata.club proxy)\n"
+        header += "# 注意：Volume 单位为手(每手100股)，Amount 单位为千元\n\n"
 
         return header + csv_string
 
@@ -195,7 +196,7 @@ def get_stock_stats_indicators_window(
 
 def get_fundamentals(
     ticker: Annotated[str, "ticker symbol of the company"],
-    curr_date: Annotated[str, "current date"] = None
+    curr_date: Annotated[str | None, "current date"] = None
 ):
     """获取公司基本面数据"""
     normalized_ticker = _convert_symbol(ticker)
@@ -263,11 +264,11 @@ def get_fundamentals(
                 lines.append(f"P/E Ratio (TTM): {float(pe_ttm):.2f}")
             if pb and float(pb) > 0:
                 lines.append(f"P/B Ratio: {float(pb):.2f}")
-            if total_mv:
+            if total_mv is not None:
                 lines.append(f"Total Market Cap (亿元): {float(total_mv) / 10000:.2f}")
-            if circ_mv:
+            if circ_mv is not None:
                 lines.append(f"Circulating Market Cap (亿元): {float(circ_mv) / 10000:.2f}")
-            if total_share:
+            if total_share is not None:
                 lines.append(f"Total Shares (亿股): {float(total_share) / 10000:.2f}")
 
         # 添加收入和利润数据（单位：亿元）
@@ -275,16 +276,16 @@ def get_fundamentals(
             inc = income.iloc[0]
             revenue = inc.get('revenue', 0)
             n_income = inc.get('n_income', 0)
-            if revenue:
+            if revenue is not None:
                 lines.append(f"Revenue (亿元): {float(revenue) / 1e8:.2f}")
-            if n_income:
+            if n_income is not None:
                 lines.append(f"Net Income (亿元): {float(n_income) / 1e8:.2f}")
 
         # 添加现金流数据（单位：亿元）
         if not cashflow.empty:
             cf = cashflow.iloc[0]
             ocf = cf.get('n_cashflow_act', 0)
-            if ocf:
+            if ocf is not None:
                 lines.append(f"Operating Cash Flow (亿元): {float(ocf) / 1e8:.2f}")
 
         # 添加股息历史数据
@@ -302,8 +303,8 @@ def get_fundamentals(
                     stk_str = f"{float(stk):.1f}股/10股" if stk and float(stk) > 0 else ""
                     pay_str = f", 派息日: {pay}" if pay and str(pay) != 'None' else ""
                     lines.append(f"  {year}: {cash_str} {stk_str}{pay_str}")
-        except Exception:
-            pass
+        except Exception as e:
+            logging.debug(f"Failed to retrieve dividend data for {ts_code}: {e}")
 
         # 添加股份回购数据
         try:
@@ -322,8 +323,8 @@ def get_fundamentals(
                         amount_str = f"{float(amount)/10000:.2f}万元" if amount else "N/A"
                         proc_str = f", 价格: {proc}元" if proc and float(proc) > 0 else ""
                         lines.append(f"  公告日: {ann}, 数量: {vol_str}, 金额: {amount_str}{proc_str}")
-        except Exception:
-            pass
+        except Exception as e:
+            logging.debug(f"Failed to retrieve repurchase data for {ts_code}: {e}")
 
         # 添加收入和利润同比增长率
         try:
@@ -385,13 +386,13 @@ def get_fundamentals(
                     rev_yoy_str = f"{float(rev_yoy):.1f}%" if rev_yoy is not None and not pd.isna(rev_yoy) else "N/A"
                     ni_yoy_str = f"{float(ni_yoy):.1f}%" if ni_yoy is not None and not pd.isna(ni_yoy) else "N/A"
                     lines.append(f"  {period:<10} {period_type:>4} {rev_str:>10} {rev_yoy_str:>10} {ni_str:>12} {ni_yoy_str:>12}")
-        except Exception:
-            pass
+        except Exception as e:
+            logging.debug(f"Failed to retrieve income growth trend for {ts_code}: {e}")
 
         header = f"# Company Fundamentals for {normalized_ticker}\n"
         header += f"# Data retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-        header += f"# Data source: Tushare (citydata.club proxy)\n"
-        header += f"# 注意：金额单位已转换为亿元，比率单位为%\n\n"
+        header += "# Data source: Tushare (citydata.club proxy)\n"
+        header += "# 注意：金额单位已转换为亿元，比率单位为%\n\n"
 
         return header + "\n".join(lines)
 
@@ -402,7 +403,7 @@ def get_fundamentals(
 def get_balance_sheet(
     ticker: Annotated[str, "ticker symbol of the company"],
     freq: Annotated[str, "frequency of data: 'annual' or 'quarterly'"] = "quarterly",
-    curr_date: Annotated[str, "current date in YYYY-MM-DD format"] = None
+    curr_date: Annotated[str | None, "current date in YYYY-MM-DD format"] = None
 ):
     """获取资产负债表"""
     normalized_ticker = _convert_symbol(ticker)
@@ -427,8 +428,8 @@ def get_balance_sheet(
 
         header = f"# Balance Sheet data for {normalized_ticker} ({freq})\n"
         header += f"# Data retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-        header += f"# Data source: Tushare (citydata.club proxy)\n"
-        header += f"# 注意：金额单位为元，如需亿元请除以1e8\n\n"
+        header += "# Data source: Tushare (citydata.club proxy)\n"
+        header += "# 注意：金额单位为元，如需亿元请除以1e8\n\n"
 
         return header + csv_string
 
@@ -439,7 +440,7 @@ def get_balance_sheet(
 def get_cashflow(
     ticker: Annotated[str, "ticker symbol of the company"],
     freq: Annotated[str, "frequency of data: 'annual' or 'quarterly'"] = "quarterly",
-    curr_date: Annotated[str, "current date in YYYY-MM-DD format"] = None
+    curr_date: Annotated[str | None, "current date in YYYY-MM-DD format"] = None
 ):
     """获取现金流量表"""
     normalized_ticker = _convert_symbol(ticker)
@@ -463,8 +464,8 @@ def get_cashflow(
 
         header = f"# Cash Flow data for {normalized_ticker} ({freq})\n"
         header += f"# Data retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-        header += f"# Data source: Tushare (citydata.club proxy)\n"
-        header += f"# 注意：金额单位为元，如需亿元请除以1e8\n\n"
+        header += "# Data source: Tushare (citydata.club proxy)\n"
+        header += "# 注意：金额单位为元，如需亿元请除以1e8\n\n"
 
         return header + csv_string
 
@@ -475,7 +476,7 @@ def get_cashflow(
 def get_income_statement(
     ticker: Annotated[str, "ticker symbol of the company"],
     freq: Annotated[str, "frequency of data: 'annual' or 'quarterly'"] = "quarterly",
-    curr_date: Annotated[str, "current date in YYYY-MM-DD format"] = None
+    curr_date: Annotated[str | None, "current date in YYYY-MM-DD format"] = None
 ):
     """获取利润表"""
     normalized_ticker = _convert_symbol(ticker)
@@ -499,8 +500,8 @@ def get_income_statement(
 
         header = f"# Income Statement data for {normalized_ticker} ({freq})\n"
         header += f"# Data retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-        header += f"# Data source: Tushare (citydata.club proxy)\n"
-        header += f"# 注意：金额单位为元，如需亿元请除以1e8\n\n"
+        header += "# Data source: Tushare (citydata.club proxy)\n"
+        header += "# 注意：金额单位为元，如需亿元请除以1e8\n\n"
 
         return header + csv_string
 
@@ -524,7 +525,7 @@ def get_insider_transactions(
 
 def get_dividend_data(
     ticker: Annotated[str, "ticker symbol of the company"],
-    curr_date: Annotated[str, "current date"] = None
+    curr_date: Annotated[str | None, "current date"] = None
 ):
     """获取股票股息分红历史数据"""
     normalized_ticker = _convert_symbol(ticker)
@@ -539,7 +540,7 @@ def get_dividend_data(
 
         lines = []
         lines.append(f"# Dividend History for {normalized_ticker}")
-        lines.append(f"# Data source: Tushare (citydata.club proxy)\n")
+        lines.append("# Data source: Tushare (citydata.club proxy)\n")
 
         # 遍历分红记录
         for _, row in df.iterrows():
@@ -565,7 +566,7 @@ def get_dividend_data(
 
 def get_share_repurchase_data(
     ticker: Annotated[str, "ticker symbol of the company"],
-    curr_date: Annotated[str, "current date"] = None
+    curr_date: Annotated[str | None, "current date"] = None
 ):
     """获取股票回购数据"""
     normalized_ticker = _convert_symbol(ticker)
@@ -583,7 +584,7 @@ def get_share_repurchase_data(
 
         lines = []
         lines.append(f"# Share Repurchase History for {normalized_ticker}")
-        lines.append(f"# Data source: Tushare (citydata.club proxy)\n")
+        lines.append("# Data source: Tushare (citydata.club proxy)\n")
 
         for _, row in df.iterrows():
             ann_date = row.get('ann_date', 'N/A')
@@ -616,7 +617,7 @@ def get_share_repurchase_data(
 def get_income_statement_with_growth(
     ticker: Annotated[str, "ticker symbol of the company"],
     freq: Annotated[str, "frequency: 'annual' or 'quarterly'"] = "quarterly",
-    curr_date: Annotated[str, "current date in YYYY-MM-DD format"] = None
+    curr_date: Annotated[str | None, "current date in YYYY-MM-DD format"] = None
 ):
     """获取利润表数据，包含同比增长率"""
     normalized_ticker = _convert_symbol(ticker)
@@ -634,8 +635,8 @@ def get_income_statement_with_growth(
 
         lines = []
         lines.append(f"# Income Statement with Growth Rates for {normalized_ticker}")
-        lines.append(f"# Data source: Tushare (citydata.club proxy)")
-        lines.append(f"# 注意：金额单位为元，增长率单位为%\n")
+        lines.append("# Data source: Tushare (citydata.club proxy)")
+        lines.append("# 注意：金额单位为元，增长率单位为%\n")
 
         # 获取列名
         cols = df.columns.tolist()
@@ -672,8 +673,8 @@ def get_income_statement_with_growth(
             rev_yoy = row.get('revenue_yoy')
             ni_yoy = row.get('n_income_yoy')
 
-            revenue_str = f"{float(revenue)/1e8:.2f}亿" if revenue else "N/A"
-            n_income_str = f"{float(n_income)/1e8:.2f}亿" if n_income else "N/A"
+            revenue_str = f"{float(revenue)/1e8:.2f}亿" if revenue is not None else "N/A"
+            n_income_str = f"{float(n_income)/1e8:.2f}亿" if n_income is not None else "N/A"
             rev_yoy_str = f"{float(rev_yoy):.1f}%" if rev_yoy is not None and not pd.isna(rev_yoy) else "N/A"
             ni_yoy_str = f"{float(ni_yoy):.1f}%" if ni_yoy is not None and not pd.isna(ni_yoy) else "N/A"
 

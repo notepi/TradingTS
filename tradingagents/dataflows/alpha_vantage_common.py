@@ -1,3 +1,4 @@
+import logging
 import os
 import requests
 import pandas as pd
@@ -63,7 +64,7 @@ def _make_api_request(function_name: str, params: dict) -> dict | str:
         # Remove entitlement if it's None or empty
         api_params.pop("entitlement", None)
     
-    response = requests.get(API_BASE_URL, params=api_params)
+    response = requests.get(API_BASE_URL, params=api_params, timeout=30)
     response.raise_for_status()
 
     response_text = response.text
@@ -118,5 +119,5 @@ def _filter_csv_by_date_range(csv_data: str, start_date: str, end_date: str) -> 
 
     except Exception as e:
         # If filtering fails, return original data with a warning
-        print(f"Warning: Failed to filter CSV data by date range: {e}")
+        logging.warning(f"Failed to filter CSV data by date range: {e}")
         return csv_data
