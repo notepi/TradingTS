@@ -5,6 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "tradingagents"
 version = "0.2.3"
+requires-python = ">=3.10"
 dependencies = [
     "pyyaml",
     "langchain-core>=0.3.81",
@@ -29,6 +30,9 @@ dependencies = [
     "typing-extensions>=4.14.0",
     "yfinance>=0.2.63",
 ]
+
+[project.scripts]
+tradingagents = "cli.main:app"
 
 [tool.hatch.build.targets.wheel]
 packages = ["tradingagents", "cli", "web", "datasource"]

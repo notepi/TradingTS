@@ -30,6 +30,7 @@ _BASE_CONFIG = {
         "news_data": "yfinance",
     },
     "tool_vendors": {},
+    "vendor_paths": {},
 }
 
 
@@ -62,3 +63,7 @@ if "quick_think_llm" in _yaml:
     DEFAULT_CONFIG["quick_think_llm"] = _yaml["quick_think_llm"]
 if "backend_url" in _yaml:
     DEFAULT_CONFIG["backend_url"] = _yaml["backend_url"]
+
+# 合并 vendor_paths（如 yaml 有定义）
+if "vendor_paths" in _yaml:
+    DEFAULT_CONFIG["vendor_paths"] = _yaml["vendor_paths"]
