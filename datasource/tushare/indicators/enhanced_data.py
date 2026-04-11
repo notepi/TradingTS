@@ -382,8 +382,8 @@ def get_fundamentals(
                     ni_yoy = inc_row.get('n_income_yoy')
                     rev_str = f"{float(rev)/1e8:.2f}" if rev else "N/A"
                     ni_str = f"{float(ni)/1e8:.2f}" if ni else "N/A"
-                    rev_yoy_str = f"{float(rev_yoy):.1f}%" if rev_yoy and not pd.isna(rev_yoy) else "N/A"
-                    ni_yoy_str = f"{float(ni_yoy):.1f}%" if ni_yoy and not pd.isna(ni_yoy) else "N/A"
+                    rev_yoy_str = f"{float(rev_yoy):.1f}%" if rev_yoy is not None and not pd.isna(rev_yoy) else "N/A"
+                    ni_yoy_str = f"{float(ni_yoy):.1f}%" if ni_yoy is not None and not pd.isna(ni_yoy) else "N/A"
                     lines.append(f"  {period:<10} {period_type:>4} {rev_str:>10} {rev_yoy_str:>10} {ni_str:>12} {ni_yoy_str:>12}")
         except Exception:
             pass

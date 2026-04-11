@@ -141,7 +141,10 @@ def _ensure_vendor_loaded(vendor: str) -> bool:
     module_path = vendor_paths.get(vendor, f"datasource.{vendor}")
 
     # Try to load external vendor module (imports __init__.py which auto-registers)
-    if os.path.isabs(module_path) or (module_path.startswith('.') and '/' in module_path):
+    # Dot-separated names (e.g. "datasource.tushare") are module paths.
+    # Anything containing "/" is a filesystem path (absolute, ./, ../, or relative like "plugins/my_vendor").
+    is_module_name = '.' in module_path and '/' not in module_path
+    if not is_module_name:
         # Filesystem path: extract parent dir and module name
         parent_dir = os.path.dirname(module_path)
         module_name = os.path.basename(module_path)
