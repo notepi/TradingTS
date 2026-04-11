@@ -34,6 +34,7 @@ from web.translation import (
 )
 from tradingagents.default_config import DEFAULT_CONFIG
 from tradingagents.graph.trading_graph import TradingAgentsGraph
+from tradingagents.dataflows.config import get_config
 from tradingagents.llm_clients.model_catalog import MODEL_OPTIONS, get_model_options
 
 
@@ -592,6 +593,12 @@ class DashboardSession:
 
         try:
             config = DEFAULT_CONFIG.copy()
+
+            # Override data_vendors from config.yaml if present
+            yaml_config = get_config()
+            if "data_vendors" in yaml_config:
+                config["data_vendors"] = yaml_config["data_vendors"]
+
             config["max_debate_rounds"] = selections["research_depth"]
             config["max_risk_discuss_rounds"] = selections["research_depth"]
             config["quick_think_llm"] = selections["quick_think_llm"]

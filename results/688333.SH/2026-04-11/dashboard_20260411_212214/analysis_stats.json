@@ -1,0 +1,6 @@
+{
+  "llm_calls": 11,
+  "tool_calls": 10,
+  "tokens_in": 18440,
+  "tokens_out": 1775
+}
