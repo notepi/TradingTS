@@ -77,6 +77,14 @@ MODEL_OPTIONS: ProviderModeOptions = {
             ("Qwen3:latest (8B, local)", "qwen3:latest"),
         ],
     },
+    "dashscope": {
+        "quick": [
+            ("GLM-5 - 阿里百炼", "glm-5"),
+        ],
+        "deep": [
+            ("GLM-5 - 阿里百炼", "glm-5"),
+        ],
+    },
 }
 
 

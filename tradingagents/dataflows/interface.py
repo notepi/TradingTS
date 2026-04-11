@@ -1,4 +1,5 @@
-from typing import Annotated
+from typing import Annotated, Callable
+import importlib
 
 # Import from vendor-specific modules
 from .y_finance import (
@@ -65,8 +66,9 @@ VENDOR_LIST = [
     "alpha_vantage",
 ]
 
-# Mapping of methods to their vendor-specific implementations
-VENDOR_METHODS = {
+# Dynamic vendor registry - populated by builtin vendors at load time,
+# and by external vendors (datasource.*) when first used
+_VENDOR_REGISTRY: dict[str, dict[str, Callable]] = {
     # core_stock_apis
     "get_stock_data": {
         "alpha_vantage": get_alpha_vantage_stock,
@@ -109,6 +111,31 @@ VENDOR_METHODS = {
     },
 }
 
+
+def register_vendor(method: str, vendor: str, func: Callable):
+    """Register a vendor implementation for a method."""
+    _VENDOR_REGISTRY.setdefault(method, {})[vendor] = func
+
+
+def _ensure_vendor_loaded(vendor: str) -> bool:
+    """
+    Dynamically load an external vendor module if not already loaded.
+    External vendors are expected in datasource.{vendor}.data module.
+
+    Returns True if vendor was loaded or already available, False if not found.
+    """
+    # Check if vendor is already registered
+    if any(vendor in v for v in _VENDOR_REGISTRY.values()):
+        return True
+
+    # Try to load external vendor module (imports __init__.py which auto-registers)
+    try:
+        importlib.import_module(f"datasource.{vendor}")
+        # Module loaded - __init__.py auto-registers all vendor methods
+        return True
+    except ImportError:
+        return False
+
 def get_category_for_method(method: str) -> str:
     """Get the category that contains the specified method."""
     for category, info in TOOLS_CATEGORIES.items():
@@ -137,21 +164,25 @@ def route_to_vendor(method: str, *args, **kwargs):
     vendor_config = get_vendor(category, method)
     primary_vendors = [v.strip() for v in vendor_config.split(',')]
 
-    if method not in VENDOR_METHODS:
+    # Ensure external vendors are loaded before routing
+    for vendor in primary_vendors:
+        _ensure_vendor_loaded(vendor)
+
+    if method not in _VENDOR_REGISTRY:
         raise ValueError(f"Method '{method}' not supported")
 
     # Build fallback chain: primary vendors first, then remaining available vendors
-    all_available_vendors = list(VENDOR_METHODS[method].keys())
+    all_available_vendors = list(_VENDOR_REGISTRY[method].keys())
     fallback_vendors = primary_vendors.copy()
     for vendor in all_available_vendors:
         if vendor not in fallback_vendors:
             fallback_vendors.append(vendor)
 
     for vendor in fallback_vendors:
-        if vendor not in VENDOR_METHODS[method]:
+        if vendor not in _VENDOR_REGISTRY[method]:
             continue
 
-        vendor_impl = VENDOR_METHODS[method][vendor]
+        vendor_impl = _VENDOR_REGISTRY[method][vendor]
         impl_func = vendor_impl[0] if isinstance(vendor_impl, list) else vendor_impl
 
         try:

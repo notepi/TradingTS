@@ -550,6 +550,16 @@ class DashboardSession:
             **buffer_snapshot,
         }
 
+        # Apply runtime translation if running with non-English output language
+        if status in {"running", "stopping"} and results_path and selections:
+            output_language = str(selections.get("output_language") or "English")
+            if output_language.lower() != "english":
+                snapshot = self._localize_running_snapshot(
+                    snapshot,
+                    run_dir=Path(results_path),
+                    language=output_language,
+                )
+
         return snapshot
 
     def _run_analysis(self, selections: Dict[str, Any], run_dir: Path) -> None:

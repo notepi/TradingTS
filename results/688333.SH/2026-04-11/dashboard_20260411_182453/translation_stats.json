@@ -1,0 +1,11 @@
+{
+  "translation_calls": 16,
+  "translation_tokens_in": 26340,
+  "translation_tokens_out": 25035,
+  "translation_documents": 14,
+  "translation_failures": 0,
+  "enabled": true,
+  "language": "Chinese",
+  "provider": "dashscope",
+  "model": "qwen3-max-2026-01-23"
+}

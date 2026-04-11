@@ -1,0 +1,11 @@
+{
+  "translation_calls": 0,
+  "translation_tokens_in": 0,
+  "translation_tokens_out": 0,
+  "translation_documents": 0,
+  "translation_failures": 0,
+  "enabled": false,
+  "language": "Chinese",
+  "provider": null,
+  "model": null
+}
