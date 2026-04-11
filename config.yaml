@@ -16,3 +16,8 @@ data_vendors:
   technical_indicators: "tushare"
   fundamental_data: "tushare"
   news_data: "yfinance"
+
+# 数据源路径配置（支持自定义路径）
+vendor_paths:
+  tushare: "datasource.tushare"
+  # my_metrics: "/path/to/my_metrics"

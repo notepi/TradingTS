@@ -120,7 +120,8 @@ def register_vendor(method: str, vendor: str, func: Callable):
 def _ensure_vendor_loaded(vendor: str) -> bool:
     """
     Dynamically load an external vendor module if not already loaded.
-    External vendors are expected in datasource.{vendor}.data module.
+    External vendors are loaded from datasource.{vendor} by default,
+    or from vendor_paths in config.yaml.
 
     Returns True if vendor was loaded or already available, False if not found.
     """
@@ -128,9 +129,14 @@ def _ensure_vendor_loaded(vendor: str) -> bool:
     if any(vendor in v for v in _VENDOR_REGISTRY.values()):
         return True
 
+    # Get module path from config (supports custom paths)
+    config = get_config()
+    vendor_paths = config.get("vendor_paths", {})
+    module_path = vendor_paths.get(vendor, f"datasource.{vendor}")
+
     # Try to load external vendor module (imports __init__.py which auto-registers)
     try:
-        importlib.import_module(f"datasource.{vendor}")
+        importlib.import_module(module_path)
         # Module loaded - __init__.py auto-registers all vendor methods
         return True
     except ImportError:
