@@ -1,21 +1,14 @@
 # TradingAgents 配置
-# 此文件包含非敏感配置
 
-# 分析目标
-stock_list:
-  - "600519.SH"
+# LLM 配置（扁平格式）
+llm_provider: "dashscope"
+deep_think_llm: "glm-5"
+quick_think_llm: "glm-5"
+backend_url: "https://coding.dashscope.aliyuncs.com/v1"
 
-# 模型配置
-llm:
-  provider: dashscope
-  model: glm-5
-  vision_model: qwen-vl-max-latest
-  translation_model: qwen3-max-2026-01-23
-
-# 输出配置
 output:
-  language: Chinese
-  log_level: INFO
+  language: "Chinese"
+  log_level: "INFO"
 
 # 数据源配置
 data_vendors:
@@ -23,4 +16,3 @@ data_vendors:
   technical_indicators: "tushare"
   fundamental_data: "tushare"
   news_data: "yfinance"
-

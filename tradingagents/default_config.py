@@ -1,38 +1,64 @@
 import os
+from pathlib import Path
+import yaml
 
-DEFAULT_CONFIG = {
+# 原项目的真正默认值
+_BASE_CONFIG = {
     "project_dir": os.path.abspath(os.path.join(os.path.dirname(__file__), ".")),
     "results_dir": os.getenv("TRADINGAGENTS_RESULTS_DIR", "./results"),
     "data_cache_dir": os.path.join(
         os.path.abspath(os.path.join(os.path.dirname(__file__), ".")),
         "dataflows/data_cache",
     ),
-    # LLM settings
-    "llm_provider": "dashscope",
-    "deep_think_llm": "glm-5",
-    "quick_think_llm": "glm-5",
-    "backend_url": "https://coding.dashscope.aliyuncs.com/v1",
-    # Provider-specific thinking configuration
-    "google_thinking_level": None,      # "high", "minimal", etc.
-    "openai_reasoning_effort": None,    # "medium", "high", "low"
-    "anthropic_effort": None,           # "high", "medium", "low"
-    # Output language for analyst reports and final decision
-    # Internal agent debate stays in English for reasoning quality
+    # LLM settings - 原项目默认值
+    "llm_provider": "openai",
+    "deep_think_llm": "gpt-5.4",
+    "quick_think_llm": "gpt-5.4-mini",
+    "backend_url": "https://api.openai.com/v1",
+    "google_thinking_level": None,
+    "openai_reasoning_effort": None,
+    "anthropic_effort": None,
     "output_language": "English",
-    # Debate and discussion settings
     "max_debate_rounds": 1,
     "max_risk_discuss_rounds": 1,
     "max_recur_limit": 100,
-    # Data vendor configuration
-    # Category-level configuration (default for all tools in category)
+    # Data vendor - 原项目默认值
     "data_vendors": {
-        "core_stock_apis": "yfinance",       # Options: alpha_vantage, yfinance
-        "technical_indicators": "yfinance",  # Options: alpha_vantage, yfinance
-        "fundamental_data": "yfinance",      # Options: alpha_vantage, yfinance
-        "news_data": "yfinance",             # Options: alpha_vantage, yfinance
+        "core_stock_apis": "yfinance",
+        "technical_indicators": "yfinance",
+        "fundamental_data": "yfinance",
+        "news_data": "yfinance",
     },
-    # Tool-level configuration (takes precedence over category-level)
-    "tool_vendors": {
-        # Example: "get_stock_data": "alpha_vantage",  # Override category default
-    },
+    "tool_vendors": {},
 }
+
+
+def _load_yaml_config() -> dict:
+    """Load config.yaml from project root."""
+    config_path = Path(__file__).parent.parent / "config.yaml"
+    if config_path.exists():
+        try:
+            with open(config_path, "r", encoding="utf-8") as f:
+                return yaml.safe_load(f) or {}
+        except Exception:
+            pass
+    return {}
+
+
+# 构建最终配置 = 原项目默认值 + yaml 覆盖
+DEFAULT_CONFIG = _BASE_CONFIG.copy()
+_yaml = _load_yaml_config()
+
+# 合并 data_vendors（如 yaml 有定义）
+if "data_vendors" in _yaml:
+    DEFAULT_CONFIG["data_vendors"] = _yaml["data_vendors"]
+
+# 合并 LLM 配置（扁平格式）
+if "llm_provider" in _yaml:
+    DEFAULT_CONFIG["llm_provider"] = _yaml["llm_provider"]
+if "deep_think_llm" in _yaml:
+    DEFAULT_CONFIG["deep_think_llm"] = _yaml["deep_think_llm"]
+if "quick_think_llm" in _yaml:
+    DEFAULT_CONFIG["quick_think_llm"] = _yaml["quick_think_llm"]
+if "backend_url" in _yaml:
+    DEFAULT_CONFIG["backend_url"] = _yaml["backend_url"]

@@ -1,38 +1,17 @@
 import tradingagents.default_config as default_config
-from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict
 
-import yaml
-
-# Use default config but allow it to be overridden
-_config: Optional[Dict] = None
-
-
-def _load_yaml_config() -> Dict:
-    """Load configuration from config.yaml if it exists."""
-    config_path = Path(__file__).parent.parent.parent / "config.yaml"
-    if config_path.exists():
-        try:
-            with open(config_path, "r", encoding="utf-8") as f:
-                return yaml.safe_load(f) or {}
-        except Exception:
-            pass
-    return {}
+_config: Dict = None
 
 
 def initialize_config():
-    """Initialize the configuration with default values and yaml overrides."""
+    """初始化配置（直接使用 DEFAULT_CONFIG）"""
     global _config
-    if _config is None:
-        _config = default_config.DEFAULT_CONFIG.copy()
-        # Override data_vendors from config.yaml if present
-        yaml_config = _load_yaml_config()
-        if "data_vendors" in yaml_config:
-            _config["data_vendors"] = yaml_config["data_vendors"]
+    _config = default_config.DEFAULT_CONFIG.copy()
 
 
 def set_config(config: Dict):
-    """Update the configuration with custom values."""
+    """更新配置"""
     global _config
     if _config is None:
         initialize_config()
@@ -40,11 +19,7 @@ def set_config(config: Dict):
 
 
 def get_config() -> Dict:
-    """Get the current configuration."""
+    """获取当前配置"""
     if _config is None:
         initialize_config()
     return _config.copy()
-
-
-# Initialize with default config
-initialize_config()
