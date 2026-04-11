@@ -146,17 +146,25 @@ def _ensure_vendor_loaded(vendor: str) -> bool:
     is_module_name = '.' in module_path and '/' not in module_path
     if not is_module_name:
         # Filesystem path: extract parent dir and module name
+        config = get_config()
+        project_dir = config.get("project_dir", "")
+        # Resolve relative paths against project_dir (not CWD)
+        if not os.path.isabs(module_path):
+            module_path = os.path.join(project_dir, module_path)
         parent_dir = os.path.dirname(module_path)
         module_name = os.path.basename(module_path)
+        # Only remove from sys.path if WE added it (not pre-existing)
+        did_insert = False
         if parent_dir and parent_dir not in sys.path:
             sys.path.insert(0, parent_dir)
+            did_insert = True
         try:
             importlib.import_module(module_name)
             return True
         except ImportError:
             return False
         finally:
-            if parent_dir and parent_dir in sys.path:
+            if did_insert and parent_dir in sys.path:
                 sys.path.remove(parent_dir)
     else:
         # Dot-separated module path: direct import

@@ -674,8 +674,8 @@ def get_income_statement_with_growth(
 
             revenue_str = f"{float(revenue)/1e8:.2f}亿" if revenue else "N/A"
             n_income_str = f"{float(n_income)/1e8:.2f}亿" if n_income else "N/A"
-            rev_yoy_str = f"{float(rev_yoy):.1f}%" if rev_yoy and not pd.isna(rev_yoy) else "N/A"
-            ni_yoy_str = f"{float(ni_yoy):.1f}%" if ni_yoy and not pd.isna(ni_yoy) else "N/A"
+            rev_yoy_str = f"{float(rev_yoy):.1f}%" if rev_yoy is not None and not pd.isna(rev_yoy) else "N/A"
+            ni_yoy_str = f"{float(ni_yoy):.1f}%" if ni_yoy is not None and not pd.isna(ni_yoy) else "N/A"
 
             lines.append(f"{end_date:<12} {revenue_str:>15} {rev_yoy_str:>10} {n_income_str:>15} {ni_yoy_str:>10}")
 
