@@ -36,6 +36,3 @@ tradingagents = "cli.main:app"
 
 [tool.hatch.build.targets.wheel]
 packages = ["tradingagents", "cli", "web", "datasource"]
-
-[tool.hatch.build.targets.wheel.include]
-files = ["config.yaml"]

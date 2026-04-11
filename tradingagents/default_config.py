@@ -36,7 +36,7 @@ _BASE_CONFIG = {
 
 def _load_yaml_config() -> dict:
     """Load config.yaml from project root."""
-    config_path = Path(__file__).parent.parent / "config.yaml"
+    config_path = Path(__file__).parent / "config.yaml"
     if config_path.exists():
         try:
             with open(config_path, "r", encoding="utf-8") as f:

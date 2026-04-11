@@ -123,8 +123,14 @@ def _ensure_vendor_loaded(vendor: str) -> bool:
     External vendors are loaded from datasource.{vendor} by default,
     or from vendor_paths in config.yaml.
 
+    vendor_paths supports both module paths (e.g. "datasource.tushare")
+    and filesystem paths (e.g. "/path/to/my_vendor").
+
     Returns True if vendor was loaded or already available, False if not found.
     """
+    import os
+    import sys
+
     # Check if vendor is already registered
     if any(vendor in v for v in _VENDOR_REGISTRY.values()):
         return True
@@ -135,12 +141,27 @@ def _ensure_vendor_loaded(vendor: str) -> bool:
     module_path = vendor_paths.get(vendor, f"datasource.{vendor}")
 
     # Try to load external vendor module (imports __init__.py which auto-registers)
-    try:
-        importlib.import_module(module_path)
-        # Module loaded - __init__.py auto-registers all vendor methods
-        return True
-    except ImportError:
-        return False
+    if os.path.isabs(module_path) or (module_path.startswith('.') and '/' in module_path):
+        # Filesystem path: extract parent dir and module name
+        parent_dir = os.path.dirname(module_path)
+        module_name = os.path.basename(module_path)
+        if parent_dir and parent_dir not in sys.path:
+            sys.path.insert(0, parent_dir)
+        try:
+            importlib.import_module(module_name)
+            return True
+        except ImportError:
+            return False
+        finally:
+            if parent_dir and parent_dir in sys.path:
+                sys.path.remove(parent_dir)
+    else:
+        # Dot-separated module path: direct import
+        try:
+            importlib.import_module(module_path)
+            return True
+        except ImportError:
+            return False
 
 def get_category_for_method(method: str) -> str:
     """Get the category that contains the specified method."""
