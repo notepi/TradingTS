@@ -304,6 +304,89 @@ def get_fundamentals(
         except Exception:
             pass
 
+        # 添加股份回购数据
+        try:
+            repurchase_df = pro.repurchase(ts_code=ts_code, limit=10)
+            repurchase_df = repurchase_df[repurchase_df['ts_code'] == ts_code]
+            if not repurchase_df.empty:
+                lines.append("")
+                lines.append("# Share Repurchase History (近10次回购)")
+                for _, rp_row in repurchase_df.head(5).iterrows():
+                    ann = rp_row.get('ann_date', 'N/A')
+                    vol = rp_row.get('vol', 0)
+                    amount = rp_row.get('amount', 0)
+                    proc = rp_row.get('proc', 0)
+                    if vol and float(vol) > 0:
+                        vol_str = f"{float(vol)/10000:.2f}万股"
+                        amount_str = f"{float(amount)/10000:.2f}万元" if amount else "N/A"
+                        proc_str = f", 价格: {proc}元" if proc and float(proc) > 0 else ""
+                        lines.append(f"  公告日: {ann}, 数量: {vol_str}, 金额: {amount_str}{proc_str}")
+        except Exception:
+            pass
+
+        # 添加收入和利润同比增长率
+        try:
+            income_df = pro.income(ts_code=ts_code)
+            if not income_df.empty:
+                # 第一步：去重 - 按(end_date, end_type)去重，保留最新ann_date的记录
+                income_df = income_df.sort_values('ann_date', ascending=False)
+                income_df = income_df.drop_duplicates(subset=['end_date', 'end_type'], keep='first')
+
+                # 第二步：分离季报(1,2,3)和年报(4)
+                income_df['end_date_str'] = income_df['end_date'].astype(str)
+                quarterly_df = income_df[income_df['end_type'].isin(['1', '2', '3'])].copy()
+
+                # 第三步：按季度分组计算同比 (Q1对Q1, Q2对Q2, Q3对Q3)
+                quarterly_df = quarterly_df.sort_values(['end_type', 'end_date'], ascending=[True, True])
+                if len(quarterly_df) >= 4:
+                    quarterly_df['revenue_yoy'] = quarterly_df.groupby('end_type')['revenue'].pct_change(periods=1) * 100
+                    quarterly_df['n_income_yoy'] = quarterly_df.groupby('end_type')['n_income'].pct_change(periods=1) * 100
+
+                # 第四步：合并YOY数据回主表
+                income_df = income_df.merge(
+                    quarterly_df[['end_date', 'revenue_yoy', 'n_income_yoy']],
+                    on='end_date',
+                    how='left'
+                )
+
+                # 第五步：年报单独处理，计算同比
+                annual_df = income_df[income_df['end_type'] == '4'].copy()
+                annual_df = annual_df.sort_values('end_date', ascending=True)
+                if len(annual_df) >= 2:
+                    annual_df['revenue_yoy'] = annual_df['revenue'].pct_change(periods=1) * 100
+                    annual_df['n_income_yoy'] = annual_df['n_income'].pct_change(periods=1) * 100
+                    # 合并年报YOY
+                    annual_yoy = annual_df[['end_date', 'revenue_yoy', 'n_income_yoy']].copy()
+                    annual_yoy.columns = ['end_date', 'revenue_yoy_annual', 'n_income_yoy_annual']
+                    income_df = income_df.merge(annual_yoy, on='end_date', how='left')
+                    # 年报用年报YOY，季报用季报YOY
+                    income_df['revenue_yoy'] = income_df['revenue_yoy'].fillna(income_df['revenue_yoy_annual'])
+                    income_df['n_income_yoy'] = income_df['n_income_yoy'].fillna(income_df['n_income_yoy_annual'])
+
+                income_df = income_df.sort_values('end_date', ascending=False)
+
+                lines.append("")
+                lines.append("# Income Growth Trend (近8期数据)")
+                lines.append("# 注意：以下数据为'年初至报告期末'累计值，非单季值，非 TTM")
+                lines.append(f"  {'报告期':<10} {'类型':>4} {'营收(亿)':>10} {'营收YOY%':>10} {'净利润(亿)':>12} {'净利润YOY%':>12}")
+                lines.append("  " + "-" * 65)
+                period_type_map = {'1': 'Q1', '2': 'Q2', '3': 'Q3', '4': '年报'}
+                for _, inc_row in income_df.head(8).iterrows():
+                    period = str(inc_row.get('end_date', 'N/A'))[:8]
+                    end_type = str(inc_row.get('end_type', 'N/A'))
+                    period_type = period_type_map.get(end_type, end_type)
+                    rev = inc_row.get('revenue', 0)
+                    ni = inc_row.get('n_income', 0)
+                    rev_yoy = inc_row.get('revenue_yoy')
+                    ni_yoy = inc_row.get('n_income_yoy')
+                    rev_str = f"{float(rev)/1e8:.2f}" if rev else "N/A"
+                    ni_str = f"{float(ni)/1e8:.2f}" if ni else "N/A"
+                    rev_yoy_str = f"{float(rev_yoy):.1f}%" if rev_yoy and not pd.isna(rev_yoy) else "N/A"
+                    ni_yoy_str = f"{float(ni_yoy):.1f}%" if ni_yoy and not pd.isna(ni_yoy) else "N/A"
+                    lines.append(f"  {period:<10} {period_type:>4} {rev_str:>10} {rev_yoy_str:>10} {ni_str:>12} {ni_yoy_str:>12}")
+        except Exception:
+            pass
+
         header = f"# Company Fundamentals for {normalized_ticker}\n"
         header += f"# Data retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
         header += f"# Data source: Tushare (citydata.club proxy)\n"
