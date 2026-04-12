@@ -1,0 +1,30 @@
+# Agents Registry - 智能体工具绑定配置
+#
+# 定义每个智能体可用的工具列表。
+# 加工具只需在此文件添加名称，装饰器会自动注册。
+#
+# usage 字段：专业工具的使用说明，会自动追加到 prompt。
+# 无 usage 的工具依赖 description（通过 bind_tools 发送）。
+
+agents:
+  fundamentals_analyst:
+    tools:
+      - name: get_fundamentals
+      - name: get_balance_sheet
+      - name: get_cashflow
+      - name: get_income_statement
+      - name: get_peg_ratio
+        usage: "Use for Peter Lynch PEG valuation analysis. PEG < 1 indicates undervalued."
+      - name: get_yoy_growth
+        usage: "Use for year-over-year growth rate analysis. Check growth stability."
+
+  market_analyst:
+    tools:
+      - name: get_stock_data
+      - name: get_indicators
+
+  news_analyst:
+    tools:
+      - name: get_news
+      - name: get_global_news
+      - name: get_insider_transactions

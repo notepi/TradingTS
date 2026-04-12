@@ -10,9 +10,11 @@ from datetime import datetime
 import pandas as pd
 import os
 
+from tradingagents.dataflows.decorators import auto_tool
 from ..data import _get_pro, _convert_symbol
 
 
+@auto_tool(description="增长率分析 - Peter Lynch 选股核心指标，稳定的增长率比短暂的高增长更重要")
 def get_yoy_growth(
     ticker: Annotated[str, "ticker symbol of the company"],
     curr_date: Annotated[str | None, "current date"] = None
@@ -123,6 +125,7 @@ def get_yoy_growth(
         return f"Error retrieving YoY growth data for {ticker}: {str(e)}"
 
 
+@auto_tool(description="PEG Ratio 分析 - Peter Lynch 核心估值指标，将市盈率与增长率结合")
 def get_peg_ratio(
     ticker: Annotated[str, "ticker symbol of the company"],
     curr_date: Annotated[str | None, "current date"] = None

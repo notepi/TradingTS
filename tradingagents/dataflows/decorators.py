@@ -2,11 +2,17 @@
 数据流工具装饰器
 
 用于声明函数的 category 并自动注册到 VENDOR_REGISTRY。
+同时支持自动创建 LangChain tool wrapper。
 """
 
 from typing import Callable
+from functools import wraps
+from langchain_core.tools import tool
 
 _current_vendor_context: str | None = None
+
+# LangChain Tool 注册表
+TOOL_REGISTRY: dict = {}
 
 
 def set_vendor_context(vendor: str | None):
@@ -50,4 +56,45 @@ def dataflow_tool(category: str, description: str | None = None):
             register_vendor(func.__name__, _current_vendor_context, func)
 
         return func
+    return decorator
+
+
+def auto_tool(description: str | None = None):
+    """
+    装饰器：自动创建 LangChain tool wrapper 并注册到 TOOL_REGISTRY。
+
+    用法:
+        @auto_tool(description="PEG Ratio 分析 - Lynch 核心指标")
+        def get_peg_ratio(ticker: str, curr_date: str = None):
+            '''PEG Ratio 分析'''
+            ...
+
+    效果:
+        1. 创建 LangChain @tool wrapper，保留原函数签名
+        2. 注册到 TOOL_REGISTRY[函数名]
+        3. 返回原函数（数据层仍可正常调用）
+
+    注意: 装饰器顺序很重要！如果同时用 @dataflow_tool，要放在它上面:
+        @auto_tool(description="...")
+        @dataflow_tool("fundamental_data")
+        def get_peg_ratio(...):
+            ...
+    """
+    def decorator(func: Callable) -> Callable:
+        # 创建 LangChain tool wrapper
+        @tool
+        @wraps(func)
+        def langchain_tool_wrapper(*args, **kwargs):
+            return func(*args, **kwargs)
+
+        # 设置 tool 名称和描述
+        langchain_tool_wrapper.name = func.__name__
+        langchain_tool_wrapper.description = description or (func.__doc__ or "")
+
+        # 注册到 TOOL_REGISTRY
+        TOOL_REGISTRY[func.__name__] = langchain_tool_wrapper
+
+        # 返回原函数，不影响数据层调用
+        return func
+
     return decorator
