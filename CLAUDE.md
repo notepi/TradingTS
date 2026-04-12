@@ -30,7 +30,12 @@ data_vendors:
   news_data: "yfinance"
 ```
 
-**数据流架构详见 [docs/dataflow-architecture.md](docs/dataflow-architecture.md)**
+**配置文件：**
+- `config.yaml` - LLM 和数据源
+- `agents_registry.yaml` - 智能体工具绑定
+- `tools_registry.yaml` - 工具定义
+
+**架构文档详见 [docs/dataflow-architecture.md](docs/dataflow-architecture.md)**
 
 ## 智能体团队
 
@@ -52,6 +57,24 @@ data_vendors:
 分析师 → 研究员辩论 → 风险评估 → 经理审批 → 交易员执行
 ```
 
+## 添加工具
+
+**加工具只改配置，不改代码。**
+
+详见 [docs/agent-tools-configuration.md](docs/agent-tools-configuration.md)
+
+| 工具类型 | 改动 |
+|---------|------|
+| 通用工具 | 数据函数 + `@auto_tool` + 2个配置文件 |
+| 专业工具 | 以上 + `agents_registry.yaml` 加 `usage` 字段 |
+
+**示例：**
+```yaml
+# agents_registry.yaml
+- name: get_new_metric
+  usage: "Use for XYZ analysis. Check ABC."
+```
+
 ## 目录结构
 
 ```
@@ -65,7 +88,10 @@ TradingAgents/
 └── tradingagents/           # 核心库
     ├── agents/              # 智能体
     ├── dataflows/           # 数据流路由
+    │   └── decorators.py    # @auto_tool 装饰器
     └── config/              # 配置管理
+        ├── tools_registry.yaml    # 工具定义
+        └── agents_registry.yaml   # 智能体工具绑定
 ```
 
 ## 开发规范
