@@ -183,15 +183,30 @@ def _ensure_vendor_loaded(vendor: str) -> bool:
             return False
 
 def get_category_for_method(method: str) -> str:
-    """Get the category that contains the specified method."""
+    """Get the category that contains the specified method.
+
+    优先查静态 TOOLS_CATEGORIES（官方契约）。
+    Fallback: 从函数元数据直接获取，或返回 'default'。
+    """
+    # 优先查静态 TOOLS_CATEGORIES（官方契约）
     for category, info in TOOLS_CATEGORIES.items():
         if method in info["tools"]:
             return category
+
+    # Fallback: 从函数元数据直接获取
+    if method in _VENDOR_REGISTRY:
+        for vendor, func in _VENDOR_REGISTRY[method].items():
+            if hasattr(func, '_dataflow_category'):
+                return func._dataflow_category
+        return "default"  # 未声明 category 的函数
+
     raise ValueError(f"Method '{method}' not found in any category")
 
 def get_vendor(category: str, method: str | None = None) -> str:
     """Get the configured vendor for a data category or specific tool method.
     Tool-level configuration takes precedence over category-level.
+
+    Fallback: 使用 config 中的 'default' vendor，否则返回 'yfinance'。
     """
     config = get_config()
 
@@ -202,7 +217,15 @@ def get_vendor(category: str, method: str | None = None) -> str:
             return tool_vendors[method]
 
     # Fall back to category-level configuration
-    return config.get("data_vendors", {}).get(category, "default")
+    data_vendors = config.get("data_vendors", {})
+    if category in data_vendors:
+        return data_vendors[category]
+
+    # Default fallback（新增）
+    if "default" in data_vendors:
+        return data_vendors["default"]
+
+    return "yfinance"  # 系统默认
 
 def route_to_vendor(method: str, *args, **kwargs):
     """Route method calls to appropriate vendor implementation with fallback support."""

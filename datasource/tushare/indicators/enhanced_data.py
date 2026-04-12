@@ -13,6 +13,7 @@ import os
 
 from ..symbols import normalize_a_share_symbol
 from ..proxy import pro_api
+from tradingagents.dataflows.decorators import dataflow_tool
 
 try:
     from dotenv import load_dotenv
@@ -714,6 +715,7 @@ def get_global_news(
     )
 
 
+@dataflow_tool("lynch_metrics")
 def get_share_repurchase(
     ticker: Annotated[str, "ticker symbol of the company"],
     curr_date: Annotated[str | None, "current date"] = None
@@ -778,6 +780,7 @@ def get_share_repurchase(
         return f"Error retrieving repurchase data for {ticker}: {str(e)}"
 
 
+@dataflow_tool("lynch_metrics")
 def get_yoy_growth(
     ticker: Annotated[str, "ticker symbol of the company"],
     curr_date: Annotated[str | None, "current date"] = None
@@ -860,6 +863,7 @@ def get_yoy_growth(
         return f"Error retrieving YoY growth data for {ticker}: {str(e)}"
 
 
+@dataflow_tool("lynch_metrics")
 def get_lynch_metrics(
     ticker: Annotated[str, "ticker symbol of the company"],
     curr_date: Annotated[str | None, "current date"] = None
