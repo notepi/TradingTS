@@ -54,9 +54,9 @@ TOOLS_CATEGORIES = {
     "lynch_metrics": {
         "description": "Peter Lynch analysis metrics",
         "tools": [
+            "get_peg_ratio",
             "get_yoy_growth",
-            "get_share_repurchase",
-            "get_lynch_metrics"
+            "get_share_repurchase"
         ]
     },
     "news_data": {

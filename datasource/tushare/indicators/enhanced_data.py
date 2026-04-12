@@ -785,7 +785,11 @@ def get_yoy_growth(
     ticker: Annotated[str, "ticker symbol of the company"],
     curr_date: Annotated[str | None, "current date"] = None
 ):
-    """获取营收和净利润同比增长率数据"""
+    """增长率分析 - Peter Lynch 选股核心指标
+
+    Peter Lynch 强调增长率是选股的核心指标。
+    稳定的增长率比短暂的高增长更重要。
+    """
     normalized_ticker = _convert_symbol(ticker)
     ts_code = normalized_ticker
 
@@ -834,9 +838,24 @@ def get_yoy_growth(
         income_df = income_df.sort_values('end_date', ascending=False)
 
         lines = []
-        lines.append(f"# YoY Growth Data for {normalized_ticker}")
-        lines.append("# Data source: Tushare (citydata.club proxy)")
-        lines.append("# 注意：以下数据为'年初至报告期末'累计值同比，非单季值，非 TTM\n")
+        lines.append(f"# 增长率分析 - {normalized_ticker}")
+        lines.append("# Data source: Tushare (citydata.club proxy)\n")
+
+        # 业务背景
+        lines.append("## 业务背景")
+        lines.append("Peter Lynch 强调增长率是选股的核心指标。")
+        lines.append("他更看重增长率的稳定性，而非短暂的高增长。")
+        lines.append("")
+        lines.append("Lynch 增长率分类标准：")
+        lines.append("- 0-10%: Slow Grower（缓慢增长型）- 大型成熟公司，股息稳定")
+        lines.append("- 10-20%: Stalwart（稳定增长型）- Lynch 推荐，PEG < 1 时买入")
+        lines.append("- 20-30%: Fast Grower（快速成长型）- 小型公司，需警惕增长放缓")
+        lines.append("- >30%: 警惕！高增长往往难以持续")
+        lines.append("")
+
+        # 增长率数据
+        lines.append("## 增长率数据")
+        lines.append("# 注意：以下数据为'年初至报告期末'累计值同比，非单季值，非 TTM")
         lines.append(f"{'报告期':<10} {'类型':>4} {'营收(亿)':>10} {'营收YOY%':>10} {'净利润(亿)':>12} {'净利润YOY%':>12}")
         lines.append("-" * 65)
 
@@ -857,6 +876,15 @@ def get_yoy_growth(
 
             lines.append(f"{period:<10} {period_type:>4} {rev_str:>10} {rev_yoy_str:>10} {ni_str:>12} {ni_yoy_str:>12}")
 
+        # Lynch 判断建议
+        lines.append("")
+        lines.append("## Lynch 判断建议")
+        lines.append("1. 增长率是否稳定？波动大则风险高，稳定增长更可靠")
+        lines.append("2. 增长来源？内生增长优于并购驱动")
+        lines.append("3. 增长可持续性？行业空间、竞争格局、公司护城河")
+        lines.append("")
+        lines.append("Lynch 金句：\"寻找那些增长率稳定在 10-20% 的公司，它们往往是最佳投资标的。\"")
+
         return "\n".join(lines)
 
     except Exception as e:
@@ -864,16 +892,14 @@ def get_yoy_growth(
 
 
 @dataflow_tool("lynch_metrics")
-def get_lynch_metrics(
+def get_peg_ratio(
     ticker: Annotated[str, "ticker symbol of the company"],
     curr_date: Annotated[str | None, "current date"] = None
 ):
-    """获取 Peter Lynch 分析所需的关键指标
+    """PEG Ratio 分析 - Peter Lynch 核心估值指标
 
-    包括：
-    - PEG Ratio (PE / EPS增长率)
-    - 股票分类依据
-    - 增长趋势评估
+    PEG (Price/Earnings to Growth) 是 Peter Lynch 发明的估值指标，
+    将市盈率与增长率结合，弥补 PE 单独使用的缺陷。
     """
     normalized_ticker = _convert_symbol(ticker)
     ts_code = normalized_ticker
@@ -891,7 +917,7 @@ def get_lynch_metrics(
         income_df = pro.income(ts_code=ts_code)
 
         if daily_basic.empty or income_df.empty:
-            return f"No data available for Lynch metrics for '{ticker}'"
+            return f"No data available for PEG analysis for '{ticker}'"
 
         # 去重处理
         income_df = income_df.sort_values('ann_date', ascending=False)
@@ -910,52 +936,81 @@ def get_lynch_metrics(
         # 获取估值数据
         db = daily_basic.iloc[0]
         pe_ttm = db.get('pe_ttm', 0)
-        pb = db.get('pb', 0)
         close = db.get('close', 0)
-        total_mv = db.get('total_mv', 0)
 
         lines = []
-        lines.append(f"# Peter Lynch Metrics for {normalized_ticker}")
+        lines.append(f"# PEG Ratio 分析 - {normalized_ticker}")
         lines.append("# Data source: Tushare (citydata.club proxy)\n")
 
-        lines.append("## 估值指标")
+        # 业务背景
+        lines.append("## 业务背景")
+        lines.append("PEG (Price/Earnings to Growth) 是 Peter Lynch 发明的估值指标。")
+        lines.append("它将市盈率与增长率结合，弥补 PE 单独使用的缺陷。")
+        lines.append("")
+        lines.append("Lynch 认为：高 PE + 高增长 可能是合理的；低 PE + 低增长 也可能是合理的。")
+        lines.append("关键看 PE 与增长率的匹配程度。")
+        lines.append("")
+
+        # 计算公式
+        lines.append("## 计算公式")
+        lines.append("PEG = P/E (TTM) / 净利润增长率")
+        lines.append("")
+
+        # 当前数据
+        lines.append("## 当前数据")
         if close:
             lines.append(f"股价: {float(close):.2f} 元")
         if pe_ttm and float(pe_ttm) > 0:
             lines.append(f"P/E (TTM): {float(pe_ttm):.2f}")
-        if pb and float(pb) > 0:
-            lines.append(f"P/B: {float(pb):.2f}")
-        if total_mv:
-            lines.append(f"市值: {float(total_mv)/10000:.2f} 亿元")
-
-        lines.append("")
-        lines.append("## 增长率")
+        else:
+            lines.append("P/E (TTM): N/A（亏损或数据缺失）")
         if ni_yoy is not None and not pd.isna(ni_yoy):
             lines.append(f"净利润增长率 (年报): {float(ni_yoy):.1f}%")
-
-            # 计算 PEG
-            if pe_ttm and float(pe_ttm) > 0 and float(ni_yoy) > 0:
-                peg = float(pe_ttm) / float(ni_yoy)
-                lines.append("")
-                lines.append("## PEG Ratio")
-                lines.append(f"PEG = PE / 净利润增长率 = {float(pe_ttm):.2f} / {float(ni_yoy):.1f} = {peg:.2f}")
-
-                # PEG 评估
-                if peg < 0.5:
-                    lines.append("PEG < 0.5: 显著低估（潜在 10x 股候选）")
-                elif peg < 1:
-                    lines.append("PEG < 1: 低估，值得深入研究")
-                elif peg < 1.5:
-                    lines.append("PEG 1-1.5: 合理估值")
-                elif peg < 2:
-                    lines.append("PEG 1.5-2: 略高估")
-                else:
-                    lines.append("PEG > 2: 高估，需谨慎")
         else:
-            lines.append("净利润增长率: 数据不足，无法计算")
-            lines.append("PEG: 无法计算（缺少增长率数据）")
+            lines.append("净利润增长率: 数据不足")
+        lines.append("")
+
+        # PEG 计算
+        if pe_ttm and float(pe_ttm) > 0 and ni_yoy is not None and not pd.isna(ni_yoy):
+            if float(ni_yoy) > 0:
+                peg = float(pe_ttm) / float(ni_yoy)
+                lines.append("## PEG 计算")
+                lines.append(f"PEG = {float(pe_ttm):.2f} / {float(ni_yoy):.1f} = {peg:.2f}")
+                lines.append("")
+
+                # Lynch 估值判断
+                lines.append("## Lynch 估值判断")
+                if peg < 0.5:
+                    lines.append(f"当前 PEG = {peg:.2f} < 0.5")
+                    lines.append("判断: 显著低估，潜在 10x 股候选")
+                    lines.append("Lynch 建议: 这类公司往往被市场忽视，值得深入研究其业务")
+                elif peg < 1:
+                    lines.append(f"当前 PEG = {peg:.2f}，在 0.5-1 区间")
+                    lines.append("判断: 低估，值得深入研究")
+                    lines.append("Lynch 建议: 寻找 PEG < 1 的公司是 Lynch 的核心选股策略")
+                elif peg < 1.5:
+                    lines.append(f"当前 PEG = {peg:.2f}，在 1-1.5 区间")
+                    lines.append("判断: 合理估值")
+                    lines.append("Lynch 建议: 可持有，但需关注增长率是否稳定")
+                elif peg < 2:
+                    lines.append(f"当前 PEG = {peg:.2f}，在 1.5-2 区间")
+                    lines.append("判断: 略高估")
+                    lines.append("Lynch 建议: 需谨慎，确认增长是否能维持")
+                else:
+                    lines.append(f"当前 PEG = {peg:.2f} > 2")
+                    lines.append("判断: 高估，需谨慎")
+                    lines.append("Lynch 建议: 可能市场过度乐观，等待回调或寻找更好标的")
+            else:
+                lines.append("## PEG 分析")
+                lines.append(f"净利润增长率 = {float(ni_yoy):.1f}% < 0")
+                lines.append("判断: 公司处于衰退期，PEG 计算无意义")
+                lines.append("Lynch 建议: 这类公司不符合 Lynch 选股标准，应回避或等待 turnaround")
+        else:
+            lines.append("## PEG 分析")
+            lines.append("无法计算 PEG（缺少 PE 或增长率数据）")
+            lines.append("Lynch 建议: 数据不足，无法进行 PEG 分析")
 
         return "\n".join(lines)
 
     except Exception as e:
-        return f"Error retrieving Lynch metrics for {ticker}: {str(e)}"
+        return f"Error retrieving PEG analysis for {ticker}: {str(e)}"
