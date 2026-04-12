@@ -2,31 +2,50 @@
 
 ## 概述
 
-本系统实现了智能体工具的配置化管理。加工具只需改配置文件，无需改动 analyst 代码。
+本系统实现了智能体工具的全流程配置化管理。加工具只需改配置文件，无需改动任何核心代码。
 
-## 架构
+## 工具调用完整流程（7 步，全自动化）
+
+| 环节 | 文件 | 自动/手动 | 说明 |
+|------|------|----------|------|
+| 1. 装饰器注册 | `@auto_tool` | 自动 | 注册到 TOOL_REGISTRY |
+| 2. 工具定义 | `tools_registry.yaml` | 手动 | 定义 category + vendors |
+| 3. 智能体绑定 | `agents_registry.yaml` | 手动 | 定义 agent 可用工具 |
+| 4. 数据源发现 | `discover_and_register()` | 自动 | 启动时动态注册 |
+| 5. 加载工具列表 | `load_agent_tools()` | 自动 | 从配置读取 |
+| 6. Analyst 绑定 | `llm.bind_tools(tools)` | 自动 | 发送 schema 给 LLM |
+| 7. ToolNode 注册 | `trading_graph.py` | 自动 | 用配置创建 ToolNode |
+
+**结果：加工具只改步骤 1-3，其余自动生效。**
+
+## 架构图
 
 ```
 数据层                    注册层                    Agent层
 ┌─────────────┐     ┌─────────────────┐     ┌──────────────────┐
 │ @auto_tool  │ --> │ tools_registry  │ --> │ agents_registry  │ --> Agent Prompt
 │ 数据函数    │     │ .yaml           │     │ .yaml            │     (自动追加)
-└─────────────┘     └─────────────────┘     ┌──────────────────┘
+└─────────────┘     └─────────────────┘     ┌──────────────────┐
                                             │ build_tools_usage │
+                                            └──────────────────┘
+                                                    ↓
+                                            ┌──────────────────┐
+                                            │ ToolNode         │  ← 也用配置加载
+                                            │ load_agent_tools │
                                             └──────────────────┘
 ```
 
 ## 加工具流程
 
-### 通用工具
-
-只需改配置，无需改代码：
+### 标准流程（3 步，不改代码）
 
 | 步骤 | 文件 | 操作 |
 |------|------|------|
 | 1 | `datasource/{vendor}/xxx.py` | 写数据函数 + `@auto_tool` |
-| 2 | `tradingagents/config/tools_registry.yaml` | 注册工具名和描述 |
+| 2 | `tradingagents/config/tools_registry.yaml` | 注册工具名、category、vendors |
 | 3 | `tradingagents/config/agents_registry.yaml` | 添加到智能体工具列表 |
+
+**ToolNode 自动生效，无需改 trading_graph.py。**
 
 ### 专业工具（需要 prompt 说明）
 
@@ -159,14 +178,33 @@ print(build_tools_usage('fundamentals_analyst'))
 ```
 tradingagents/
 ├── config/
-│   ├── tools_registry.yaml      # 工具定义
+│   ├── config.yaml              # vendor_paths + data_vendors
+│   ├── tools_registry.yaml      # 工具定义（category + vendors）
 │   └── agents_registry.yaml     # 智能体工具绑定
 ├── dataflows/
-│   └── decorators.py            # @auto_tool 装饰器
+│   ├── decorators.py            # @auto_tool 装饰器 + TOOL_REGISTRY
+│   ├── interface.py             # discover_and_register() + route_to_vendor()
+│   └── yfinance_news.py         # yfinance 新闻实现
 ├── agents/
 │   ├── utils/
 │   │   └── agent_utils.py       # load_agent_tools(), build_tools_usage()
 │   └── analysts/
-│       └── fundamentals_analyst.py  # prompt 自动追加
-└── ...
+│       └── fundamentals_analyst.py  # prompt 自动追加 usage
+│       └── market_analyst.py
+│       └── news_analyst.py
+│       └── social_analyst.py
+└── graph/
+    └── trading_graph.py         # ToolNode(load_agent_tools(...))
 ```
+
+## 数据源切换
+
+切换数据源（如从 tushare 到 akshare）只需：
+
+| 步骤 | 文件 | 操作 |
+|------|------|------|
+| 1 | `datasource/akshare/` | 创建目录 + 实现同名函数 |
+| 2 | `tools_registry.yaml` | vendors 添加 `akshare` |
+| 3 | `config.yaml` | vendor_paths + data_vendors 配置 |
+
+详见 [docs/dataflow-architecture.md](docs/dataflow-architecture.md)。

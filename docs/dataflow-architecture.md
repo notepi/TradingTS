@@ -1,6 +1,6 @@
 # 数据流架构文档
 
-> 本文档说明 TradingAgents 的数据流三层架构、配置方式、以及如何添加新指标。
+> 本文档说明 TradingAgents 的数据流三层架构、配置方式、以及如何添加新指标或切换数据源。
 
 ## 三层架构
 
@@ -32,6 +32,7 @@
 │  tushare       │ A股专用（citydata.club 代理）                  │
 │  yfinance      │ 全球市场（美股为主）                           │
 │  alpha_vantage │ 美股专用                                        │
+│  akshare       │ A股开源（可扩展）                              │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -40,8 +41,10 @@
 | 文件 | 作用 |
 |------|------|
 | `tradingagents/config/tools_registry.yaml` | 单表管理工具定义（category + vendors） |
+| `tradingagents/config/agents_registry.yaml` | 智能体工具绑定配置 |
 | `tradingagents/dataflows/interface.py` | 自动发现机制，启动时动态注册 |
-| `tradingagents/config.yaml` | 数据源路由配置 |
+| `tradingagents/dataflows/decorators.py` | `@auto_tool` 装饰器 |
+| `tradingagents/config.yaml` | 数据源路由配置（vendor_paths + data_vendors） |
 | `datasource/{vendor}/` | 函数实现 |
 
 ## tools_registry.yaml 配置格式
@@ -128,27 +131,35 @@ __all__ = [
 
 ## 添加新数据源
 
+**切换数据源只需改动 3 个地方，核心代码不动：**
+
+| 改动位置 | 文件 | 说明 |
+|----------|------|------|
+| **1. 数据实现** | `datasource/{new_vendor}/` | 实现同名函数 |
+| **2. 工具定义** | `tools_registry.yaml` | vendors 添加新数据源 |
+| **3. 系统配置** | `config.yaml` | vendor_paths + data_vendors |
+
 ### 步骤 1：创建目录结构
 
 ```
 datasource/
-└── my_vendor/
+└── akshare/
     ├── __init__.py      # 导出所有函数
     ├── data.py          # 基础数据函数
     └── indicators.py    # 指标函数（可选）
 ```
 
-### 步骤 2：实现函数
+### 步骤 2：实现同名函数
 
 ```python
-# datasource/my_vendor/data.py
+# datasource/akshare/data.py
 
 def get_stock_data(ticker: str, start_date: str, end_date: str):
-    """获取股价数据"""
-    # 调用你的数据源 API...
+    """获取股价数据 - 函数名必须和 tools_registry.yaml 一致"""
+    # 调用 akshare API...
     return result
 
-def get_fundamentals(ticker: str):
+def get_fundamentals(ticker: str, curr_date: str = None):
     """获取基本面数据"""
     return result
 ```
@@ -156,7 +167,7 @@ def get_fundamentals(ticker: str):
 ### 步骤 3：导出函数
 
 ```python
-# datasource/my_vendor/__init__.py
+# datasource/akshare/__init__.py
 
 from .data import get_stock_data, get_fundamentals, ...
 
@@ -168,19 +179,27 @@ __all__ = ["get_stock_data", "get_fundamentals", ...]
 ```yaml
 tools:
   get_stock_data:
-    vendors: [tushare, yfinance, alpha_vantage, my_vendor]  # 添加新数据源
+    vendors: [tushare, akshare, yfinance]  # 添加 akshare
 ```
 
 ### 步骤 5：配置路由
 
 ```yaml
 # config.yaml
-data_vendors:
-  core_stock_apis: "my_vendor"  # 使用新数据源
-
 vendor_paths:
-  my_vendor: "datasource.my_vendor"  # 或自定义路径
+  tushare: "datasource.tushare"
+  akshare: "datasource.akshare"   # 新增：告诉系统去哪里找
+
+data_vendors:
+  core_stock_apis: "akshare"      # 切换到 akshare
 ```
+
+### 完成！
+
+无需改动：
+- `agents/utils/*_tools.py` - 通过路由层自动适配
+- `agents_registry.yaml` - 只关心工具名
+- `tradingagents/graph/` - ToolNode 用配置加载
 
 ## 数据流调用流程
 
@@ -214,20 +233,27 @@ data_vendors:
 TradingAgents/
 ├── tradingagents/
 │   ├── config/
-│   │   ├── tools_registry.yaml   # 工具定义（单表）
-│   │   └── config.yaml           # 路由配置
-│   └── dataflows/
-│       └── interface.py          # 自动发现 + 路由
+│   │   ├── config.yaml              # 路由配置 + vendor_paths
+│   │   ├── tools_registry.yaml      # 工具定义（单表）
+│   │   └── agents_registry.yaml     # 智能体工具绑定
+│   ├── dataflows/
+│   │   ├── decorators.py            # @auto_tool 装饰器
+│   │   ├── interface.py             # 自动发现 + 路由
+│   │   └── yfinance_news.py         # yfinance 新闻实现
+│   ├── agents/
+│   │   └── utils/
+│   │       └── agent_utils.py       # load_agent_tools(), build_tools_usage()
+│   └── graph/
+│       └── trading_graph.py         # ToolNode 用配置加载
 ├── datasource/
-│   ├── tushare/                  # A股数据源
+│   ├── tushare/                     # A股数据源
 │   │   ├── __init__.py
 │   │   ├── data.py
 │   │   └── indicators/
-│   │       └── enhanced_data.py  # Lynch 指标
-│   ├── yfinance/                 # 全球数据源（历史遗留）
-│   └── alpha_vantage/            # 美股数据源（历史遗留）
+│   │       └── enhanced_data.py     # Lynch 指标
+│   └── {new_vendor}/                # 新数据源（按同样结构）
 └── docs/
-    └── dataflow-architecture.md  # 本文档
+    └── dataflow-architecture.md     # 本文档
 ```
 
 ## 常见问题
@@ -238,17 +264,17 @@ TradingAgents/
 
 ### Q: 数据源切换后代码需要改吗？
 
-不需要。只需改 `config.yaml` 配置。
+不需要。只需改 `config.yaml` 配置 + `datasource/{new_vendor}/` 目录。
 
 ### Q: 如何添加一个新的 category？
 
 1. 在 `tools_registry.yaml` 添加工具时指定新 category
 2. 在 `config.yaml` 的 `data_vendors` 添加路由配置
 
-### Q: 为什么 yfinance/alpha_vantage 的函数在主目录？
+### Q: 为什么 yfinance 新闻函数在 dataflows 目录？
 
-历史遗留结构。tushare 采用更清晰的目录结构（`datasource/tushare/`）。
+因为它是内置实现的，不属于外部数据源目录。vendor_paths 可以指向任意模块路径。
 
 ---
 
-*最后更新：2026-04-12*
+*最后更新：2026-04-13*
