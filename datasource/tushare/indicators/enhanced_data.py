@@ -955,39 +955,6 @@ def get_lynch_metrics(
             lines.append("净利润增长率: 数据不足，无法计算")
             lines.append("PEG: 无法计算（缺少增长率数据）")
 
-        lines.append("")
-        lines.append("## 股票分类参考")
-        lines.append("根据 Lynch 的 6 种分类标准：")
-
-        # 基于市值判断
-        if total_mv:
-            mv = float(total_mv) / 10000
-            if mv < 50:
-                lines.append(f"- 市值 {mv:.2f}亿 < 50亿: 可能是 Fast Grower（快速成长型）")
-            elif mv < 200:
-                lines.append(f"- 市值 {mv:.2f}亿 50-200亿: 可能是 Stalwart（稳定增长型）")
-            else:
-                lines.append(f"- 市值 {mv:.2f}亿 > 200亿: 可能是 Slow Grower（缓慢增长型）")
-
-        lines.append("")
-        lines.append("## Lynch 13 条选股标准参考")
-        lines.append("1. 公司名字枯燥乏味?")
-        lines.append("2. 公司业务枯燥乏味?")
-        lines.append("3. 公司业务令人反感?")
-        lines.append("4. 公司是从大公司分拆出来的?")
-        lines.append("5. 机构投资者少，分析师不跟踪?")
-        lines.append("6. 公司被谣言包围（谣言通常是假的）?")
-        lines.append("7. 公司业务让人感到压抑?")
-        lines.append("8. 公司处于零增长行业中?")
-        lines.append("9. 公司有一个利基（细分市场壁垒）?")
-        lines.append("10. 人们要不断购买公司的产品?")
-        lines.append("11. 公司是技术用户（不是纯技术股）?")
-        lines.append("12. 公司内部人在买入自家股票?")
-        lines.append("13. 公司在回购股票?")
-
-        lines.append("")
-        lines.append("--- 需要人工判断以上标准 ---")
-
         return "\n".join(lines)
 
     except Exception as e:
