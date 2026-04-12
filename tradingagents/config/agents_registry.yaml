@@ -23,6 +23,10 @@ agents:
       - name: get_stock_data
       - name: get_indicators
 
+  social_analyst:
+    tools:
+      - name: get_news
+
   news_analyst:
     tools:
       - name: get_news

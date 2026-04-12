@@ -437,29 +437,3 @@ def get_insider_transactions(
     )
 
 
-def get_news(
-    ticker: Annotated[str, "ticker symbol"],
-    start_date: Annotated[str, "start date YYYY-MM-DD"],
-    end_date: Annotated[str, "end date YYYY-MM-DD"]
-):
-    """Return stable placeholder text for unsupported ticker news."""
-    try:
-        normalized_ticker = _convert_symbol(ticker)
-    except ValueError as exc:
-        return f"Error retrieving news for {ticker}: {str(exc)}"
-    return (
-        f"Company news data is not available via Tushare citydata mode for "
-        f"'{normalized_ticker}' between {start_date} and {end_date}."
-    )
-
-
-def get_global_news(
-    curr_date: Annotated[str, "current date YYYY-MM-DD"],
-    look_back_days: Annotated[int, "days to look back"] = 7,
-    limit: Annotated[int, "max number of news"] = 10
-):
-    """Return stable placeholder text for unsupported macro news."""
-    return (
-        "Global market news is not available via Tushare citydata mode. "
-        f"Requested date: {curr_date}, look_back_days: {look_back_days}, limit: {limit}."
-    )

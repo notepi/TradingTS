@@ -15,8 +15,6 @@ from .data import (
     get_cashflow,
     get_income_statement,
     get_insider_transactions,
-    get_news,
-    get_global_news,
 )
 
 # 导入 Lynch 指标函数
@@ -38,8 +36,6 @@ __all__ = [
     "get_cashflow",
     "get_income_statement",
     "get_insider_transactions",
-    "get_news",
-    "get_global_news",
     # Lynch 指标函数
     "get_peg_ratio",
     "get_yoy_growth",

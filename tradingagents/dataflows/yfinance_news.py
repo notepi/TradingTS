@@ -5,6 +5,7 @@ from datetime import datetime
 from dateutil.relativedelta import relativedelta
 
 from .stockstats_utils import yf_retry
+from .decorators import auto_tool
 
 
 def _extract_article_data(article: dict) -> dict:
@@ -48,7 +49,8 @@ def _extract_article_data(article: dict) -> dict:
         }
 
 
-def get_news_yfinance(
+@auto_tool(description="股票相关新闻 - 从 yfinance 获取")
+def get_news(
     ticker: str,
     start_date: str,
     end_date: str,
@@ -104,7 +106,8 @@ def get_news_yfinance(
         return f"Error fetching news for {ticker}: {str(e)}"
 
 
-def get_global_news_yfinance(
+@auto_tool(description="全球市场新闻 - 从 yfinance 获取")
+def get_global_news(
     curr_date: str,
     look_back_days: int = 7,
     limit: int = 10,
