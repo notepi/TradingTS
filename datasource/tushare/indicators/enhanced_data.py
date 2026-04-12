@@ -712,3 +712,279 @@ def get_global_news(
         "Global market news is not available via Tushare citydata mode. "
         f"Requested date: {curr_date}, look_back_days: {look_back_days}, limit: {limit}."
     )
+
+
+def get_share_repurchase(
+    ticker: Annotated[str, "ticker symbol of the company"],
+    curr_date: Annotated[str | None, "current date"] = None
+):
+    """获取股票回购历史数据（管理层信心信号）"""
+    normalized_ticker = _convert_symbol(ticker)
+    ts_code = normalized_ticker
+
+    try:
+        pro = _get_pro()
+        df = pro.repurchase(ts_code=ts_code, limit=20)
+
+        # 过滤出该股票的数据
+        df = df[df['ts_code'] == ts_code]
+
+        if df.empty:
+            return f"No share repurchase data found for '{ticker}'"
+
+        lines = []
+        lines.append(f"# Share Repurchase History for {normalized_ticker}")
+        lines.append("# Data source: Tushare (citydata.club proxy)")
+        lines.append("# 注意：回购数据反映管理层对公司价值的信心\n")
+
+        total_vol = 0
+        total_amount = 0
+
+        for _, row in df.iterrows():
+            ann_date = row.get('ann_date', 'N/A')
+            end_date = row.get('end_date', 'N/A')
+            vol = row.get('vol', 0)  # 回购数量（股）
+            amount = row.get('amount', 0)  # 回购金额（元）
+            proc = row.get('proc', 0)  # 回购进度
+
+            if vol and float(vol) > 0:
+                vol_str = f"{float(vol)/10000:.2f}万股"
+                total_vol += float(vol)
+            else:
+                vol_str = "N/A"
+
+            if amount and float(amount) > 0:
+                amount_str = f"{float(amount)/10000:.2f}万元"
+                total_amount += float(amount)
+            else:
+                amount_str = "N/A"
+
+            proc_str = str(proc) if proc else "N/A"
+
+            lines.append(f"公告日: {ann_date}, 完成日: {end_date}, 数量: {vol_str}, 金额: {amount_str}, 进度: {proc_str}")
+
+        # 添加汇总
+        if total_vol > 0 or total_amount > 0:
+            lines.append("")
+            lines.append("--- 汇总 ---")
+            if total_vol > 0:
+                lines.append(f"累计回购数量: {total_vol/10000:.2f}万股")
+            if total_amount > 0:
+                lines.append(f"累计回购金额: {total_amount/10000:.2f}万元")
+
+        return "\n".join(lines)
+
+    except Exception as e:
+        return f"Error retrieving repurchase data for {ticker}: {str(e)}"
+
+
+def get_yoy_growth(
+    ticker: Annotated[str, "ticker symbol of the company"],
+    curr_date: Annotated[str | None, "current date"] = None
+):
+    """获取营收和净利润同比增长率数据"""
+    normalized_ticker = _convert_symbol(ticker)
+    ts_code = normalized_ticker
+
+    try:
+        pro = _get_pro()
+        income_df = pro.income(ts_code=ts_code)
+
+        if income_df.empty:
+            return f"No income data found for '{ticker}'"
+
+        # 第一步：去重 - 按(end_date, end_type)去重，保留最新ann_date的记录
+        income_df = income_df.sort_values('ann_date', ascending=False)
+        income_df = income_df.drop_duplicates(subset=['end_date', 'end_type'], keep='first')
+
+        # 第二步：分离季报(1,2,3)和年报(4)
+        income_df['end_date_str'] = income_df['end_date'].astype(str)
+        quarterly_df = income_df[income_df['end_type'].isin(['1', '2', '3'])].copy()
+
+        # 第三步：按季度分组计算同比 (Q1对Q1, Q2对Q2, Q3对Q3)
+        quarterly_df = quarterly_df.sort_values(['end_type', 'end_date'], ascending=[True, True])
+        if len(quarterly_df) >= 4:
+            quarterly_df['revenue_yoy'] = quarterly_df.groupby('end_type')['revenue'].pct_change(periods=1) * 100
+            quarterly_df['n_income_yoy'] = quarterly_df.groupby('end_type')['n_income'].pct_change(periods=1) * 100
+
+        # 第四步：合并YOY数据回主表
+        income_df = income_df.merge(
+            quarterly_df[['end_date', 'revenue_yoy', 'n_income_yoy']],
+            on='end_date',
+            how='left'
+        )
+
+        # 第五步：年报单独处理，计算同比
+        annual_df = income_df[income_df['end_type'] == '4'].copy()
+        annual_df = annual_df.sort_values('end_date', ascending=True)
+        if len(annual_df) >= 2:
+            annual_df['revenue_yoy'] = annual_df['revenue'].pct_change(periods=1) * 100
+            annual_df['n_income_yoy'] = annual_df['n_income'].pct_change(periods=1) * 100
+            # 合并年报YOY
+            annual_yoy = annual_df[['end_date', 'revenue_yoy', 'n_income_yoy']].copy()
+            annual_yoy.columns = ['end_date', 'revenue_yoy_annual', 'n_income_yoy_annual']
+            income_df = income_df.merge(annual_yoy, on='end_date', how='left')
+            # 年报用年报YOY，季报用季报YOY
+            income_df['revenue_yoy'] = income_df['revenue_yoy'].fillna(income_df['revenue_yoy_annual'])
+            income_df['n_income_yoy'] = income_df['n_income_yoy'].fillna(income_df['n_income_yoy_annual'])
+
+        income_df = income_df.sort_values('end_date', ascending=False)
+
+        lines = []
+        lines.append(f"# YoY Growth Data for {normalized_ticker}")
+        lines.append("# Data source: Tushare (citydata.club proxy)")
+        lines.append("# 注意：以下数据为'年初至报告期末'累计值同比，非单季值，非 TTM\n")
+        lines.append(f"{'报告期':<10} {'类型':>4} {'营收(亿)':>10} {'营收YOY%':>10} {'净利润(亿)':>12} {'净利润YOY%':>12}")
+        lines.append("-" * 65)
+
+        period_type_map = {'1': 'Q1', '2': 'Q2', '3': 'Q3', '4': '年报'}
+        for _, row in income_df.head(8).iterrows():
+            period = str(row.get('end_date', 'N/A'))[:8]
+            end_type = str(row.get('end_type', 'N/A'))
+            period_type = period_type_map.get(end_type, end_type)
+            rev = row.get('revenue', 0)
+            ni = row.get('n_income', 0)
+            rev_yoy = row.get('revenue_yoy')
+            ni_yoy = row.get('n_income_yoy')
+
+            rev_str = f"{float(rev)/1e8:.2f}" if rev is not None else "N/A"
+            ni_str = f"{float(ni)/1e8:.2f}" if ni is not None else "N/A"
+            rev_yoy_str = f"{float(rev_yoy):.1f}%" if rev_yoy is not None and not pd.isna(rev_yoy) else "N/A"
+            ni_yoy_str = f"{float(ni_yoy):.1f}%" if ni_yoy is not None and not pd.isna(ni_yoy) else "N/A"
+
+            lines.append(f"{period:<10} {period_type:>4} {rev_str:>10} {rev_yoy_str:>10} {ni_str:>12} {ni_yoy_str:>12}")
+
+        return "\n".join(lines)
+
+    except Exception as e:
+        return f"Error retrieving YoY growth data for {ticker}: {str(e)}"
+
+
+def get_lynch_metrics(
+    ticker: Annotated[str, "ticker symbol of the company"],
+    curr_date: Annotated[str | None, "current date"] = None
+):
+    """获取 Peter Lynch 分析所需的关键指标
+
+    包括：
+    - PEG Ratio (PE / EPS增长率)
+    - 股票分类依据
+    - 增长趋势评估
+    """
+    normalized_ticker = _convert_symbol(ticker)
+    ts_code = normalized_ticker
+
+    try:
+        pro = _get_pro()
+
+        # 获取估值数据
+        today_str = datetime.now().strftime("%Y%m%d")
+        daily_basic = pro.daily_basic(ts_code=ts_code, start_date=today_str, end_date=today_str)
+        if daily_basic.empty:
+            daily_basic = pro.daily_basic(ts_code=ts_code, end_date=today_str, limit=1)
+
+        # 获取利润数据计算增长率
+        income_df = pro.income(ts_code=ts_code)
+
+        if daily_basic.empty or income_df.empty:
+            return f"No data available for Lynch metrics for '{ticker}'"
+
+        # 去重处理
+        income_df = income_df.sort_values('ann_date', ascending=False)
+        income_df = income_df.drop_duplicates(subset=['end_date', 'end_type'], keep='first')
+
+        # 计算年报净利润增长率
+        annual_df = income_df[income_df['end_type'] == '4'].copy()
+        annual_df = annual_df.sort_values('end_date', ascending=True)
+        if len(annual_df) >= 2:
+            annual_df['n_income_yoy'] = annual_df['n_income'].pct_change(periods=1) * 100
+
+        # 获取最新年报增长率
+        latest_annual = annual_df.iloc[-1] if len(annual_df) > 0 else None
+        ni_yoy = latest_annual.get('n_income_yoy') if latest_annual is not None else None
+
+        # 获取估值数据
+        db = daily_basic.iloc[0]
+        pe_ttm = db.get('pe_ttm', 0)
+        pb = db.get('pb', 0)
+        close = db.get('close', 0)
+        total_mv = db.get('total_mv', 0)
+
+        lines = []
+        lines.append(f"# Peter Lynch Metrics for {normalized_ticker}")
+        lines.append("# Data source: Tushare (citydata.club proxy)\n")
+
+        lines.append("## 估值指标")
+        if close:
+            lines.append(f"股价: {float(close):.2f} 元")
+        if pe_ttm and float(pe_ttm) > 0:
+            lines.append(f"P/E (TTM): {float(pe_ttm):.2f}")
+        if pb and float(pb) > 0:
+            lines.append(f"P/B: {float(pb):.2f}")
+        if total_mv:
+            lines.append(f"市值: {float(total_mv)/10000:.2f} 亿元")
+
+        lines.append("")
+        lines.append("## 增长率")
+        if ni_yoy is not None and not pd.isna(ni_yoy):
+            lines.append(f"净利润增长率 (年报): {float(ni_yoy):.1f}%")
+
+            # 计算 PEG
+            if pe_ttm and float(pe_ttm) > 0 and float(ni_yoy) > 0:
+                peg = float(pe_ttm) / float(ni_yoy)
+                lines.append("")
+                lines.append("## PEG Ratio")
+                lines.append(f"PEG = PE / 净利润增长率 = {float(pe_ttm):.2f} / {float(ni_yoy):.1f} = {peg:.2f}")
+
+                # PEG 评估
+                if peg < 0.5:
+                    lines.append("PEG < 0.5: 显著低估（潜在 10x 股候选）")
+                elif peg < 1:
+                    lines.append("PEG < 1: 低估，值得深入研究")
+                elif peg < 1.5:
+                    lines.append("PEG 1-1.5: 合理估值")
+                elif peg < 2:
+                    lines.append("PEG 1.5-2: 略高估")
+                else:
+                    lines.append("PEG > 2: 高估，需谨慎")
+        else:
+            lines.append("净利润增长率: 数据不足，无法计算")
+            lines.append("PEG: 无法计算（缺少增长率数据）")
+
+        lines.append("")
+        lines.append("## 股票分类参考")
+        lines.append("根据 Lynch 的 6 种分类标准：")
+
+        # 基于市值判断
+        if total_mv:
+            mv = float(total_mv) / 10000
+            if mv < 50:
+                lines.append(f"- 市值 {mv:.2f}亿 < 50亿: 可能是 Fast Grower（快速成长型）")
+            elif mv < 200:
+                lines.append(f"- 市值 {mv:.2f}亿 50-200亿: 可能是 Stalwart（稳定增长型）")
+            else:
+                lines.append(f"- 市值 {mv:.2f}亿 > 200亿: 可能是 Slow Grower（缓慢增长型）")
+
+        lines.append("")
+        lines.append("## Lynch 13 条选股标准参考")
+        lines.append("1. 公司名字枯燥乏味?")
+        lines.append("2. 公司业务枯燥乏味?")
+        lines.append("3. 公司业务令人反感?")
+        lines.append("4. 公司是从大公司分拆出来的?")
+        lines.append("5. 机构投资者少，分析师不跟踪?")
+        lines.append("6. 公司被谣言包围（谣言通常是假的）?")
+        lines.append("7. 公司业务让人感到压抑?")
+        lines.append("8. 公司处于零增长行业中?")
+        lines.append("9. 公司有一个利基（细分市场壁垒）?")
+        lines.append("10. 人们要不断购买公司的产品?")
+        lines.append("11. 公司是技术用户（不是纯技术股）?")
+        lines.append("12. 公司内部人在买入自家股票?")
+        lines.append("13. 公司在回购股票?")
+
+        lines.append("")
+        lines.append("--- 需要人工判断以上标准 ---")
+
+        return "\n".join(lines)
+
+    except Exception as e:
+        return f"Error retrieving Lynch metrics for {ticker}: {str(e)}"

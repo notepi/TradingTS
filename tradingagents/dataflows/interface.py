@@ -51,6 +51,14 @@ TOOLS_CATEGORIES = {
             "get_income_statement"
         ]
     },
+    "lynch_metrics": {
+        "description": "Peter Lynch analysis metrics",
+        "tools": [
+            "get_yoy_growth",
+            "get_share_repurchase",
+            "get_lynch_metrics"
+        ]
+    },
     "news_data": {
         "description": "News and insider data",
         "tools": [

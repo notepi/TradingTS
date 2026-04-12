@@ -15,6 +15,7 @@ data_vendors:
   core_stock_apis: "tushare"
   technical_indicators: "tushare"
   fundamental_data: "tushare"
+  lynch_metrics: "tushare"
   news_data: "yfinance"
 
 # 数据源路径配置（支持自定义路径）
