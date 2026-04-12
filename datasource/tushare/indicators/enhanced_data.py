@@ -2,6 +2,7 @@
 Lynch 指标函数 - Peter Lynch 分析方法
 
 提供 PEG Ratio 和增长率分析，带有业务背景和 Lynch 方法论说明。
+函数从 tools_registry.yaml 自动发现，无需 decorator。
 """
 
 from typing import Annotated
@@ -10,10 +11,8 @@ import pandas as pd
 import os
 
 from ..data import _get_pro, _convert_symbol
-from tradingagents.dataflows.decorators import dataflow_tool
 
 
-@dataflow_tool("lynch_metrics")
 def get_yoy_growth(
     ticker: Annotated[str, "ticker symbol of the company"],
     curr_date: Annotated[str | None, "current date"] = None
@@ -124,7 +123,6 @@ def get_yoy_growth(
         return f"Error retrieving YoY growth data for {ticker}: {str(e)}"
 
 
-@dataflow_tool("lynch_metrics")
 def get_peg_ratio(
     ticker: Annotated[str, "ticker symbol of the company"],
     curr_date: Annotated[str | None, "current date"] = None

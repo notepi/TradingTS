@@ -15,8 +15,11 @@ data_vendors:
   core_stock_apis: "tushare"
   technical_indicators: "tushare"
   fundamental_data: "tushare"
-  lynch_metrics: "tushare"
   news_data: "yfinance"
+
+# 工具级别数据源配置（可选，优先级高于 data_vendors）
+tool_vendors: {}
+  # get_peg_ratio: "alpha_vantage"  # 示例：单个工具切换数据源
 
 # 数据源路径配置（支持自定义路径）
 vendor_paths:

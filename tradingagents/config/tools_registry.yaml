@@ -1,0 +1,56 @@
+# Tools Registry - 单表管理工具定义
+#
+# 添加新指标只需在此文件加配置 + 在 datasource/{vendor}/ 写函数
+
+tools:
+  # core_stock_apis - 股票价格数据
+  get_stock_data:
+    category: core_stock_apis
+    description: "股票价格数据 OHLCV"
+    vendors: [tushare, yfinance, alpha_vantage]
+
+  # technical_indicators - 技术指标
+  get_indicators:
+    category: technical_indicators
+    description: "技术指标（MACD, RSI 等）"
+    vendors: [tushare, yfinance, alpha_vantage]
+
+  # fundamental_data - 基本面数据
+  get_fundamentals:
+    category: fundamental_data
+    description: "基本面概览"
+    vendors: [tushare, yfinance, alpha_vantage]
+  get_balance_sheet:
+    category: fundamental_data
+    description: "资产负债表"
+    vendors: [tushare, yfinance, alpha_vantage]
+  get_cashflow:
+    category: fundamental_data
+    description: "现金流量表"
+    vendors: [tushare, yfinance, alpha_vantage]
+  get_income_statement:
+    category: fundamental_data
+    description: "利润表"
+    vendors: [tushare, yfinance, alpha_vantage]
+  get_peg_ratio:
+    category: fundamental_data
+    description: "PEG Ratio = PE(TTM) / 净利润增长率"
+    vendors: [tushare]
+  get_yoy_growth:
+    category: fundamental_data
+    description: "营收同比增长率"
+    vendors: [tushare]
+
+  # news_data - 新闻数据
+  get_news:
+    category: news_data
+    description: "股票相关新闻"
+    vendors: [yfinance, alpha_vantage]
+  get_global_news:
+    category: news_data
+    description: "全球市场新闻"
+    vendors: [yfinance, alpha_vantage]
+  get_insider_transactions:
+    category: news_data
+    description: "内部交易"
+    vendors: [yfinance, alpha_vantage]
