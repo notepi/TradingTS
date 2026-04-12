@@ -50,6 +50,9 @@ data_vendors:
   technical_indicators: "tushare"  # 技术指标
   fundamental_data: "tushare"   # 基本面数据
   news_data: "yfinance"          # 新闻（tushare 不支持特定股票新闻）
+
+# tool_vendors: 单工具级别路由（优先级更高）
+tool_vendors: {}
 ```
 
 A股数据使用 **tushare + citydata.club 代理**，需要在 `.env` 中配置：
@@ -57,7 +60,36 @@ A股数据使用 **tushare + citydata.club 代理**，需要在 `.env` 中配置
 CITYDATA_TOKEN=your_token_here
 ```
 
-数据源文件位于 `datasource/` 目录下，新建数据源只需在该目录下创建新文件夹。
+**数据流架构详见 [docs/dataflow-architecture.md](docs/dataflow-architecture.md)**
+
+#### 添加新指标
+
+1. `tradingagents/config/tools_registry.yaml` 添加配置：
+   ```yaml
+   get_gross_margin:
+     category: fundamental_data
+     description: "毛利率"
+     vendors: [tushare]
+   ```
+
+2. `datasource/tushare/` 实现函数（纯实现，无需 decorator）
+
+3. `datasource/tushare/__init__.py` 导出函数
+
+#### 切换数据源
+
+只需改 `config.yaml`：
+```yaml
+data_vendors:
+  fundamental_data: "yfinance"  # 从 tushare 切到 yfinance
+```
+
+#### 添加新数据源
+
+1. 创建 `datasource/my_vendor/` 目录
+2. 实现函数并导出
+3. 更新 `tools_registry.yaml` 的 vendors 列表
+4. 配置 `config.yaml` 路由
 
 ## 核心架构
 
