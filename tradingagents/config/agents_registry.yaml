@@ -14,9 +14,7 @@ agents:
       - name: get_cashflow
       - name: get_income_statement
       - name: get_peg_ratio
-        usage: "Use for Peter Lynch PEG valuation analysis. PEG < 1 indicates undervalued."
       - name: get_yoy_growth
-        usage: "Use for year-over-year growth rate analysis. Check growth stability."
 
   market_analyst:
     tools:
