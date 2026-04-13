@@ -3,8 +3,24 @@
 ## 快速运行
 
 ```bash
-uv run python main.py          # 单股票分析
-uv run python -m web           # Web Dashboard（端口 8765）
+# 单股票分析（API 调用，生成本地日志）
+# 1. 启动 dashboard 服务
+uv run python -m web
+
+# 2. 调用 API 触发分析（另开终端）
+curl -X POST http://localhost:8765/api/start \
+  -H "Content-Type: application/json" \
+  -d '{
+    "ticker": "688333.SH",
+    "analysis_date": "2026-04-14",
+    "analysts": ["market", "social", "news", "fundamentals"],
+    "output_language": "Chinese"
+  }'
+
+# output_language 支持: Chinese, English, Japanese 等
+# 设置为 Chinese 会启用翻译功能
+
+# 结果目录：results/688333.SH/2026-04-14/dashboard_YYYYMMDD_HHMMSS/
 ```
 
 ## 环境配置

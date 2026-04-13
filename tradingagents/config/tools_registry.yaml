@@ -1,56 +1,154 @@
 # Tools Registry - 单表管理工具定义
 #
-# 添加新指标只需在此文件加配置 + 在 datasource/{vendor}/ 写函数
+# 添加新工具只需在此文件加配置 + 在 datasource/{vendor}/ 写函数
+#
+# 文档规范：
+# - description: 工具的简短说明
+# - vendors: 支持此工具的数据源列表
+# - 对于 get_indicators，indicators 列表定义支持的指标
 
 tools:
   # core_stock_apis - 股票价格数据
   get_stock_data:
     category: core_stock_apis
-    description: "股票价格数据 OHLCV"
+    description: |
+      股票价格数据（OHLCV）- 获取股票的历史行情数据。
+      返回开盘价、最高价、最低价、收盘价、成交量。
     vendors: [tushare, yfinance, alpha_vantage]
 
   # technical_indicators - 技术指标
   get_indicators:
     category: technical_indicators
-    description: "技术指标（MACD, RSI 等）"
-    vendors: [tushare, yfinance, alpha_vantage]
+    description: |
+      技术指标工具 - 获取股票的各类技术分析指标。
+      用于分析股票趋势、动量、超买超卖、波动率等情况。
+    vendors:
+      tushare:
+        indicators:
+          - close_10_ema
+          - close_50_sma
+          - close_200_sma
+          - macd
+          - macds
+          - macdh
+          - rsi
+          - mfi
+          - cci
+          - wr
+          - kdjk
+          - kdjd
+          - kdjj
+          - boll
+          - boll_ub
+          - boll_lb
+          - atr
+          - vwma
+        # 指标说明文档
+        indicator_docs: |
+          # 技术指标说明
+
+          ## 移动平均线
+          | 指标 | 说明 | 使用场景 |
+          | close_10_ema | 10日指数移动平均，短周期快速均线 | 短期趋势，灵敏度高 |
+          | close_50_sma | 50日简单移动平均 | 中期趋势，支撑/阻力位 |
+          | close_200_sma | 200日简单移动平均 | 长期趋势，牛熊市分界线 |
+
+          ## MACD 系列（判断趋势动量）
+          | 指标 | 说明 | 使用信号 |
+          | macd | MACD主线 (12EMA-26EMA) | >0多头，<0空头 |
+          | macds | MACD信号线 (9EMA) | 金叉买入，死叉卖出 |
+          | macdh | MACD柱状图 | 红柱扩大=多头增强，绿柱扩大=空头增强 |
+
+          ## 动量指标（判断超买超卖）
+          | 指标 | 说明 | 超买信号 | 超卖信号 |
+          | rsi | 相对强弱指数 | >70 超买 | <30 超卖 |
+          | cci | 顺势指标 | >100 强势 | <-100 弱势 |
+          | wr | 威廉指标 | >80 滞涨 | <20 滞跌 |
+          | kdjk | KDJ K线 | >80 | <20 |
+
+          ## KDJ 随机指标
+          | 指标 | 说明 |
+          | kdjk | K线，随机波动，灵敏度高 |
+          | kdjd | D线，K的3日平滑，移动较慢 |
+          | kdjj | J线，D的3日加权，波动最大 |
+
+          ## 布林带（判断波动和趋势）
+          | 指标 | 说明 |
+          | boll | 中轨(20SMA)，支撑/阻力位 |
+          | boll_ub | 上轨，价格压力位，触及可考虑卖出 |
+          | boll_lb | 下轨，价格支撑位，触及可考虑买入 |
+
+          ## 波动率指标
+          | 指标 | 说明 |
+          | atr | 平均真实波幅，衡量市场波动大小 |
+          | vwma | 成交量加权移动平均，结合价格和成交量 |
+          | mfi | 资金流量指数，类似RSI但用成交量加权 |
+
+          ## 使用建议
+          - 分析趋势：用 close_50_sma, close_200_sma, boll
+          - 分析动量：用 rsi, macd, kdjk
+          - 分析超买超卖：用 rsi, wr, cci
+          - 分析波动：用 atr, boll（布林带收窄=波动即将放大）
+      yfinance:
+        indicators: [macd, rsi, boll, adx, sma, ema]
+      alpha_vantage:
+        indicators: [macd, rsi, boll]
 
   # fundamental_data - 基本面数据
   get_fundamentals:
     category: fundamental_data
-    description: "基本面概览"
+    description: |
+      基本面概览 - 获取公司的核心财务指标。
+      包括市值、PE、PB、ROE、现金流等关键数据。
     vendors: [tushare, yfinance, alpha_vantage]
   get_balance_sheet:
     category: fundamental_data
-    description: "资产负债表"
+    description: |
+      资产负债表 - 获取公司的资产、负债、所有者权益数据。
+      用于分析公司资产结构、负债水平、财务稳健性。
     vendors: [tushare, yfinance, alpha_vantage]
   get_cashflow:
     category: fundamental_data
-    description: "现金流量表"
+    description: |
+      现金流量表 - 获取公司经营、投资、筹资活动现金流。
+      同时提供累计值和单季值，便于分析现金流趋势。
     vendors: [tushare, yfinance, alpha_vantage]
   get_income_statement:
     category: fundamental_data
-    description: "利润表"
+    description: |
+      利润表 - 获取公司的收入、成本、利润数据。
+      用于分析公司盈利能力、毛利率、净利率变化。
     vendors: [tushare, yfinance, alpha_vantage]
   get_peg_ratio:
     category: fundamental_data
-    description: "PEG Ratio = PE(TTM) / 净利润增长率"
+    description: |
+      PEG估值指标 - PEG = PE(TTM) / 净利润增长率。
+      用于判断成长股估值是否合理。
+      PEG < 1 相对低估，PEG > 1 相对高估。
     vendors: [tushare]
   get_yoy_growth:
     category: fundamental_data
-    description: "营收同比增长率"
+    description: |
+      同比增长率数据 - 营收和净利润的同比增长率。
+      同时提供累计值和单季值，含营收YOY和净利润YOY。
     vendors: [tushare]
 
   # news_data - 新闻数据
   get_news:
     category: news_data
-    description: "股票相关新闻"
+    description: |
+      股票相关新闻 - 获取指定股票的最新新闻和公告。
+      用于分析公司事件、重大公告对股价的影响。
     vendors: [yfinance, alpha_vantage]
   get_global_news:
     category: news_data
-    description: "全球市场新闻"
+    description: |
+      全球市场新闻 - 获取全球宏观经济、市场动态新闻。
+      用于分析宏观因素对股票的影响。
     vendors: [yfinance, alpha_vantage]
   get_insider_transactions:
     category: news_data
-    description: "内部交易"
+    description: |
+      内部交易数据 - 获取公司内部人员（高管、董事）的股票交易记录。
+      用于分析内部人对公司前景的判断。
     vendors: [yfinance, alpha_vantage]

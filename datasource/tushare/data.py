@@ -1,5 +1,5 @@
 """
-Tushare 数据接口 - 使用 citydata.club 代理
+Tushare 数据接口 - 双模式 API（HTTP 代理 / 官方 SDK）
 
 与 y_finance.py 保持相同接口，实现平滑切换。
 """
@@ -11,7 +11,62 @@ import pandas as pd
 import os
 
 from .symbols import normalize_a_share_symbol
-from .proxy import pro_api
+from .api import get_api
+
+# 指标名称映射：stockstats 使用的名称 -> 指标说明
+# 注意：stockstats 的指标名称是下划线格式（如 kdjk），不是下划线前的格式
+INDICATOR_DESCRIPTIONS = {
+    # 移动平均
+    "close_10_ema": "10 EMA: A short-term exponential moving average.",
+    "close_50_sma": "50 SMA: A medium-term simple moving average.",
+    "close_200_sma": "200 SMA: A long-term simple moving average.",
+    # MACD 系列（配套使用）
+    "macd": "MACD: Moving Average Convergence Divergence (12, 26, 9).",
+    "macds": "MACD Signal: EMA of MACD line (9-period).",
+    "macdh": "MACD Histogram: Difference between MACD and Signal line.",
+    # 动量
+    "rsi": "RSI: Relative Strength Index (14-period) - overbought/oversold.",
+    "mfi": "MFI: Money Flow Index (14-period) - volume-weighted RSI.",
+    "cci": "CCI: Commodity Channel Index (14-period) - trend strength.",
+    "wr": "WR: Williams %R (14-period) - overbought/oversold.",
+    # KDJ 随机指标（配套使用）
+    "kdjk": "KDJ K: Stochastic Fast K line (9-period).",
+    "kdjd": "KDJ D: Stochastic Slow D line (3-period SMA of K).",
+    "kdjj": "KDJ J: Stochastic J line - volatility adjusted K.",
+    # 布林带（配套使用）
+    "boll": "Bollinger Middle: 20 SMA as basis for Bollinger Bands.",
+    "boll_ub": "Bollinger Upper: Upper band (Middle + 2 std).",
+    "boll_lb": "Bollinger Lower: Lower band (Middle - 2 std).",
+    # 波动率
+    "atr": "ATR: Average True Range (14-period) - market volatility.",
+    "vwma": "VWMA: Volume Weighted Moving Average.",
+}
+
+
+def _get_tushare_indicators() -> list[str]:
+    """从 tools_registry.yaml 读取 tushare 支持的指标列表"""
+    import os
+    import yaml
+
+    # 向上查找 project root
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
+
+    registry_path = os.path.join(project_root, "tradingagents/config/tools_registry.yaml")
+    if not os.path.exists(registry_path):
+        registry_path = os.path.join(project_root, "config/tools_registry.yaml")
+
+    try:
+        with open(registry_path, encoding="utf-8") as f:
+            tools = yaml.safe_load(f).get("tools", {})
+            get_indicators = tools.get("get_indicators", {})
+            vendors = get_indicators.get("vendors", {})
+            tushare = vendors.get("tushare", {})
+            indicators = tushare.get("indicators", [])
+            return indicators
+    except Exception:
+        # 如果读取失败，返回默认值
+        return list(INDICATOR_DESCRIPTIONS.keys())
 
 try:
     from dotenv import load_dotenv
@@ -23,13 +78,8 @@ load_dotenv()
 
 
 def _get_pro():
-    """获取 Tushare API 客户端"""
-    if pro_api is None:
-        raise ValueError("tushare_proxy module is unavailable")
-    token = os.getenv("CITYDATA_TOKEN") or os.getenv("TUSHARE_TOKEN")
-    if not token:
-        raise ValueError("CITYDATA_TOKEN or TUSHARE_TOKEN is not configured")
-    return pro_api(token)
+    """获取 Tushare API 客户端（自动选择模式）"""
+    return get_api()  # 从环境变量读取模式和 token
 
 
 def _convert_symbol(symbol: str) -> str:
@@ -107,28 +157,17 @@ def get_stock_stats_indicators_window(
 
     注意：此函数固定获取1年历史数据以确保指标计算准确，
     look_back_days 只控制输出显示的日期范围，不影响计算精度。
+
+    支持的指标列表从 tools_registry.yaml 读取，添加新指标只需修改配置文件。
     """
 
-    # 指标说明
-    best_ind_params = {
-        "close_50_sma": "50 SMA: A medium-term trend indicator.",
-        "close_200_sma": "200 SMA: A long-term trend benchmark.",
-        "close_10_ema": "10 EMA: A responsive short-term average.",
-        "macd": "MACD: Computes momentum via differences of EMAs.",
-        "macds": "MACD Signal: An EMA smoothing of the MACD line.",
-        "macdh": "MACD Histogram: Shows the gap between the MACD line and its signal.",
-        "rsi": "RSI: Measures momentum to flag overbought/oversold conditions.",
-        "boll": "Bollinger Middle: A 20 SMA serving as the basis for Bollinger Bands.",
-        "boll_ub": "Bollinger Upper Band: Typically 2 standard deviations above the middle line.",
-        "boll_lb": "Bollinger Lower Band: Typically 2 standard deviations below the middle line.",
-        "atr": "ATR: Averages true range to measure volatility.",
-        "vwma": "VWMA: A moving average weighted by volume.",
-        "mfi": "MFI: The Money Flow Index.",
-    }
+    # 从配置读取支持的指标列表
+    supported_indicators = _get_tushare_indicators()
 
-    if indicator not in best_ind_params:
+    if indicator not in supported_indicators:
         raise ValueError(
-            f"Indicator {indicator} is not supported. Please choose from: {list(best_ind_params.keys())}"
+            f"Indicator '{indicator}' is not supported. "
+            f"Available indicators: {supported_indicators}"
         )
 
     # 固定获取1年数据以确保所有指标计算准确（参考 y_finance.py 的做法）
@@ -197,7 +236,7 @@ def get_stock_stats_indicators_window(
             f"# 计算: 使用1年历史数据确保准确，显示最近 {look_back_days} 天\n\n"
             + "\n".join(result_lines)
             + "\n\n"
-            + best_ind_params.get(indicator, "No description available.")
+            + INDICATOR_DESCRIPTIONS.get(indicator, "No description available.")
             + "\n\n注意：Volume 单位为手(每手100股)，涉及成交量的指标(VWMA/MFI)需注意单位换算。"
         )
 
@@ -225,11 +264,11 @@ def get_fundamentals(
         # 获取财务指标
         indicator = pro.fina_indicator(ts_code=ts_code)
 
-        # 获取市值和估值数据
-        today_str = datetime.now().strftime("%Y%m%d")
-        daily_basic = pro.daily_basic(ts_code=ts_code, start_date=today_str, end_date=today_str)
+        # 获取市值和估值数据 - 使用 curr_date 参数
+        date_str = curr_date.replace("-", "") if curr_date else datetime.now().strftime("%Y%m%d")
+        daily_basic = pro.daily_basic(ts_code=ts_code, start_date=date_str, end_date=date_str)
         if daily_basic.empty:
-            daily_basic = pro.daily_basic(ts_code=ts_code, end_date=today_str, limit=1)
+            daily_basic = pro.daily_basic(ts_code=ts_code, end_date=date_str, limit=1)
 
         # 获取利润表
         income = pro.income(ts_code=ts_code)

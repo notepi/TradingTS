@@ -1,10 +1,20 @@
 """
-datasource.tushare - Tushare A股数据源（citydata.club代理）
+datasource.tushare - Tushare A股数据源（双模式：HTTP代理 / 官方SDK）
 
 提供A股数据接口，与yfinance接口兼容。
 
+## 两种模式
+
+| 模式 | 环境变量 | 适用场景 |
+|------|----------|----------|
+| proxy | TUSHARE_MODE=proxy | 基础数据接口 |
+| sdk | TUSHARE_MODE=sdk | 需本地计算（如 SMA） |
+
 函数从 tools_registry.yaml 自动发现，无需手动注册。
 """
+
+# 导入双模式 API
+from .api import get_api, TushareAPI, pro_api
 
 # 导入 data.py 的函数
 from .data import (
@@ -28,6 +38,10 @@ get_stock_data = get_Tushare_data_online
 get_indicators = get_stock_stats_indicators_window
 
 __all__ = [
+    # 双模式 API
+    "get_api",
+    "TushareAPI",
+    "pro_api",
     # 基础数据函数
     "get_stock_data",
     "get_indicators",

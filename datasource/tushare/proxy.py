@@ -1,21 +1,45 @@
 """
-tushare_proxy.py - Tushare 透明代理层
+tushare_proxy.py - Tushare HTTP 代理层
 
-目标：业务代码零改动，继续按原生 tushare 写法调用。
-底层自动走 citydata.club 代理，不走官方 Tushare SDK。
+## 项目中的两种调用方式
 
-用法（替换原来的 tushare 初始化）：
+| 方式 | 模块 | 适用场景 |
+|------|------|----------|
+| **HTTP 代理** | 本文件 `proxy.py` | 基础数据接口（daily/income/balancesheet等） |
+| **官方 SDK** | `import tushare as ts` | 需本地计算的接口（pro_bar + ma 参数） |
+
+## HTTP 代理的局限
+
+- 纯转发 HTTP 请求到 citydata.club
+- **不支持 SDK 本地计算功能**（如 `ma` 参数的均线计算）
+- `pro_bar` 虽然能调用，但无法返回 MA 列
+
+## 何时用官方 SDK
+
+需要以下功能时，直接用 `import tushare as ts`：
+
+```python
+import tushare as ts
+ts.set_token(os.getenv('CITYDATA_TOKEN'))
+
+# SMA 均线（SDK 本地计算）
+df = ts.pro_bar(ts_code='000001.SZ', ma=[5, 10, 20, 50])
+# 返回：ma5, ma10, ma20, ma50 列
+```
+
+## 用法（替换原生 tushare HTTP 调用）
+
     # 原来：
     import tushare as ts
     pro = ts.pro_api(token)
+    df = pro.daily(ts_code='688333.SH')  # HTTP API
 
-    # 现在：
-    from tushare_proxy import pro_api
+    # 现在（HTTP 代理）：
+    from datasource.tushare.proxy import pro_api
     pro = pro_api(token)
+    df = pro.daily(ts_code='688333.SH')  # 转发到 citydata
 
-    # 之后完全一样：
-    df = pro.daily(ts_code='688333.SH', start_date='20260310', end_date='20260317')
-    df = pro.income(ts_code='688333.SH')
+    # 业务代码无感知，接口签名完全一致
 """
 
 import os
@@ -58,7 +82,7 @@ class TushareProxyAPI:
 
         url = f"{self._base_url}/{api_name}"
         try:
-            resp = requests.post(url, data=params, timeout=15)
+            resp = requests.post(url, data=params, timeout=30)
             resp.raise_for_status()
         except requests.exceptions.HTTPError as e:
             if resp.status_code == 404:
