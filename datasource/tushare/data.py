@@ -84,7 +84,8 @@ def get_Tushare_data_online(
         # 转换为 CSV
         csv_string = df.to_csv(index=False)
 
-        header = f"# Stock data for {normalized_symbol} from {start_date} to {end_date}\n"
+        header = "[Tool: get_stock_data] - 原始价格数据\n"
+        header += f"# Stock data for {normalized_symbol} from {start_date} to {end_date}\n"
         header += f"# Total records: {len(df)}\n"
         header += f"# Data retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
         header += f"# Data source: Tushare (citydata.club proxy)\n"
@@ -180,6 +181,7 @@ def get_stock_stats_indicators_window(
             current_dt = current_dt - relativedelta(days=1)
 
         result_str = (
+            f"[Tool: get_indicators] [Indicator: {indicator}]\n"
             f"## {indicator} values from {before.strftime('%Y-%m-%d')} to {curr_date}:\n\n"
             + "\n".join(result_lines)
             + "\n\n"
@@ -288,19 +290,38 @@ def get_fundamentals(
 
         # 添加股息历史数据
         try:
-            dividend_df = pro.dividend(ts_code=ts_code, limit=10)
+            dividend_df = pro.dividend(ts_code=ts_code, limit=20)
             if not dividend_df.empty:
                 lines.append("")
-                lines.append("# Dividend History (近10次分红)")
-                for _, div_row in dividend_df.head(6).iterrows():
-                    year = str(div_row.get('end_date', 'N/A'))[:4]
+                lines.append("# Dividend History (分红记录)")
+
+                # 按 end_date 去重，优先显示"实施"状态
+                dividend_df = dividend_df.sort_values('ann_date', ascending=False)
+                # 过滤只显示"实施"状态的记录（实际执行的分红）
+                implemented = dividend_df[dividend_df['div_proc'] == '实施'].copy()
+                if implemented.empty:
+                    # 如果没有实施记录，显示最新的预案
+                    implemented = dividend_df.drop_duplicates(subset=['end_date'], keep='first')
+
+                for _, div_row in implemented.head(6).iterrows():
+                    end_date = str(div_row.get('end_date', 'N/A'))
+                    year = end_date[:4]
+                    period = "年报" if end_date.endswith('1231') else "半年报" if end_date.endswith('0630') else ""
                     cash = div_row.get('cash_div', 0)
                     stk = div_row.get('stk_div', 0)
                     pay = div_row.get('pay_date', 'N/A')
-                    cash_str = f"{float(cash):.4f}元/股" if cash and float(cash) > 0 else "无现金分红"
-                    stk_str = f"{float(stk):.1f}股/10股" if stk and float(stk) > 0 else ""
+                    ex = div_row.get('ex_date', 'N/A')
+
+                    # cash_div 单位是"元/股"，显示时转换为"每10股派现X元"
+                    cash_str = f"每10股派现{float(cash)*10:.2f}元" if cash and float(cash) > 0 else ""
+                    stk_str = f"每10股转增{float(stk):.1f}股" if stk and float(stk) > 0 else ""
                     pay_str = f", 派息日: {pay}" if pay and str(pay) != 'None' else ""
-                    lines.append(f"  {year}: {cash_str} {stk_str}{pay_str}")
+                    ex_str = f", 除息日: {ex}" if ex and str(ex) != 'None' else ""
+
+                    div_info = f"{cash_str} {stk_str}".strip()
+                    if not div_info:
+                        div_info = "无分红"
+                    lines.append(f"  {year}年{period}: {div_info}{pay_str}{ex_str}")
         except Exception:
             pass
 
@@ -351,12 +372,94 @@ def get_balance_sheet(
         return f"Error retrieving balance sheet for {ticker}: {str(e)}"
 
 
+def _calculate_single_quarter_cashflow(df):
+    """从累计值计算单季现金流值
+
+    Args:
+        df: 现金流数据，包含 end_date, end_type, n_cashflow_act, n_cashflow_inv_act, n_cash_flows_fnc_act
+
+    Returns:
+        dict: {end_date: {'ocf': 单季经营现金流, 'icf': 单季投资现金流, 'fcf': 单季筹资现金流}}
+    """
+    df = df.copy()
+    df['year'] = df['end_date'].astype(str).str[:4]
+
+    single_q_values = {}
+
+    for year in df['year'].unique():
+        year_df = df[df['year'] == year]
+
+        # Q1 (end_type=1) 本身就是单季
+        q1 = year_df[year_df['end_type'] == '1']
+        if not q1.empty:
+            q1_row = q1.iloc[0]
+            q1_date = q1_row['end_date']
+            single_q_values[q1_date] = {
+                'ocf': q1_row.get('n_cashflow_act', 0) or 0,
+                'icf': q1_row.get('n_cashflow_inv_act', 0) or 0,
+                'fcf': q1_row.get('n_cash_flows_fnc_act', 0) or 0
+            }
+
+        # Q2单季 = Q2累计 - Q1累计
+        q2 = year_df[year_df['end_type'] == '2']
+        if not q2.empty and not q1.empty:
+            q2_row = q2.iloc[0]
+            q2_date = q2_row['end_date']
+            q1_ocf = q1.iloc[0].get('n_cashflow_act', 0) or 0
+            q1_icf = q1.iloc[0].get('n_cashflow_inv_act', 0) or 0
+            q1_fcf = q1.iloc[0].get('n_cash_flows_fnc_act', 0) or 0
+            q2_ocf = q2_row.get('n_cashflow_act', 0) or 0
+            q2_icf = q2_row.get('n_cashflow_inv_act', 0) or 0
+            q2_fcf = q2_row.get('n_cash_flows_fnc_act', 0) or 0
+            single_q_values[q2_date] = {
+                'ocf': q2_ocf - q1_ocf,
+                'icf': q2_icf - q1_icf,
+                'fcf': q2_fcf - q1_fcf
+            }
+
+        # Q3单季 = Q3累计 - Q2累计
+        q3 = year_df[year_df['end_type'] == '3']
+        if not q3.empty and not q2.empty:
+            q3_row = q3.iloc[0]
+            q3_date = q3_row['end_date']
+            q2_ocf = q2.iloc[0].get('n_cashflow_act', 0) or 0
+            q2_icf = q2.iloc[0].get('n_cashflow_inv_act', 0) or 0
+            q2_fcf = q2.iloc[0].get('n_cash_flows_fnc_act', 0) or 0
+            q3_ocf = q3_row.get('n_cashflow_act', 0) or 0
+            q3_icf = q3_row.get('n_cashflow_inv_act', 0) or 0
+            q3_fcf = q3_row.get('n_cash_flows_fnc_act', 0) or 0
+            single_q_values[q3_date] = {
+                'ocf': q3_ocf - q2_ocf,
+                'icf': q3_icf - q2_icf,
+                'fcf': q3_fcf - q2_fcf
+            }
+
+        # 年报/Q4单季 = 年报累计 - Q3累计
+        annual = year_df[year_df['end_type'] == '4']
+        if not annual.empty and not q3.empty:
+            annual_row = annual.iloc[0]
+            annual_date = annual_row['end_date']
+            q3_ocf = q3.iloc[0].get('n_cashflow_act', 0) or 0
+            q3_icf = q3.iloc[0].get('n_cashflow_inv_act', 0) or 0
+            q3_fcf = q3.iloc[0].get('n_cash_flows_fnc_act', 0) or 0
+            annual_ocf = annual_row.get('n_cashflow_act', 0) or 0
+            annual_icf = annual_row.get('n_cashflow_inv_act', 0) or 0
+            annual_fcf = annual_row.get('n_cash_flows_fnc_act', 0) or 0
+            single_q_values[annual_date] = {
+                'ocf': annual_ocf - q3_ocf,
+                'icf': annual_icf - q3_icf,
+                'fcf': annual_fcf - q3_fcf
+            }
+
+    return single_q_values
+
+
 def get_cashflow(
     ticker: Annotated[str, "ticker symbol of the company"],
     freq: Annotated[str, "frequency of data: 'annual' or 'quarterly'"] = "quarterly",
     curr_date: Annotated[str, "current date in YYYY-MM-DD format"] = None
 ):
-    """获取现金流量表"""
+    """获取现金流量表 - 同时返回累计值和单季值"""
     normalized_ticker = _convert_symbol(ticker)
     ts_code = normalized_ticker
 
@@ -367,21 +470,64 @@ def get_cashflow(
         if df.empty:
             return f"No cash flow data found for symbol '{ticker}'"
 
+        # 去重处理 - 优先使用修正后的数据 (update_flag=1)
+        if 'update_flag' in df.columns:
+            df['_sort_key'] = df['update_flag'].astype(int) * 10000000000 + df['ann_date'].astype(int)
+            df = df.sort_values('_sort_key', ascending=False)
+            df = df.drop_duplicates(subset=['end_date', 'end_type'], keep='first')
+            df = df.drop(columns=['_sort_key'])
+        else:
+            df = df.sort_values('ann_date', ascending=False)
+            df = df.drop_duplicates(subset=['end_date', 'end_type'], keep='first')
+
+        # 计算单季值
+        single_q_values = _calculate_single_quarter_cashflow(df)
+
         df = df.sort_values("end_date", ascending=False)
 
         if freq == "quarterly":
-            df = df.head(8)
+            df_display = df.head(8)
         else:
-            df = df.head(4)
+            df_display = df.head(4)
 
-        csv_string = df.to_csv(index=False)
+        lines = []
+        lines.append(f"# Cash Flow data for {normalized_ticker} ({freq})")
+        lines.append("# 数据口径：累计值（年初至报告期末）+ 单季值（计算得出）")
+        lines.append("# 来源：Tushare 最新报表，不含会计差错更正后数据")
+        lines.append("# 金额单位：亿元\n")
 
-        header = f"# Cash Flow data for {normalized_ticker} ({freq})\n"
-        header += f"# Data retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-        header += f"# Data source: Tushare (citydata.club proxy)\n"
-        header += f"# 注意：金额单位为元，如需亿元请除以1e8\n\n"
+        # 现金流数据表
+        lines.append(f"{'报告期':<10} {'类型':>4} {'累计经营(亿)':>12} {'单季经营(亿)':>12} {'累计投资(亿)':>12} {'单季投资(亿)':>12} {'累计筹资(亿)':>12} {'单季筹资(亿)':>12}")
+        lines.append("-" * 95)
 
-        return header + csv_string
+        period_type_map = {'1': 'Q1', '2': 'Q2', '3': 'Q3', '4': '年报'}
+        for _, row in df_display.iterrows():
+            period = str(row.get('end_date', 'N/A'))[:8]
+            end_type = str(row.get('end_type', 'N/A'))
+            period_type = period_type_map.get(end_type, end_type)
+
+            # 累计值
+            ocf_cum = row.get('n_cashflow_act', 0) or 0
+            icf_cum = row.get('n_cashflow_inv_act', 0) or 0
+            fcf_cum = row.get('n_cash_flows_fnc_act', 0) or 0
+
+            # 单季值
+            end_date = row.get('end_date')
+            single_q = single_q_values.get(end_date, {'ocf': 0, 'icf': 0, 'fcf': 0})
+            ocf_single = single_q['ocf']
+            icf_single = single_q['icf']
+            fcf_single = single_q['fcf']
+
+            ocf_cum_str = f"{float(ocf_cum)/1e8:.2f}"
+            ocf_single_str = f"{float(ocf_single)/1e8:.2f}"
+            icf_cum_str = f"{float(icf_cum)/1e8:.2f}"
+            icf_single_str = f"{float(icf_single)/1e8:.2f}"
+            fcf_cum_str = f"{float(fcf_cum)/1e8:.2f}"
+            fcf_single_str = f"{float(fcf_single)/1e8:.2f}"
+
+            lines.append(f"{period:<10} {period_type:>4} {ocf_cum_str:>12} {ocf_single_str:>12} {icf_cum_str:>12} {icf_single_str:>12} {fcf_cum_str:>12} {fcf_single_str:>12}")
+
+        return "\n".join(lines)
 
     except Exception as e:
         return f"Error retrieving cash flow for {ticker}: {str(e)}"
