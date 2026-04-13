@@ -101,9 +101,13 @@ def get_stock_stats_indicators_window(
     symbol: Annotated[str, "ticker symbol of the company"],
     indicator: Annotated[str, "technical indicator to get the analysis and report of"],
     curr_date: Annotated[str, "The current trading date you are trading on, YYYY-mm-dd"],
-    look_back_days: Annotated[int, "how many days to look back"] = 30,
+    look_back_days: Annotated[int, "how many days of values to display in the output"] = 30,
 ) -> str:
-    """获取技术指标数据"""
+    """获取技术指标数据
+
+    注意：此函数固定获取1年历史数据以确保指标计算准确，
+    look_back_days 只控制输出显示的日期范围，不影响计算精度。
+    """
 
     # 指标说明
     best_ind_params = {
@@ -122,40 +126,25 @@ def get_stock_stats_indicators_window(
         "mfi": "MFI: The Money Flow Index.",
     }
 
-    # 指标最小数据窗口需求（确保计算准确）
-    # 注意：stockstats 需要足够的历史数据来初始化计算
-    min_data_window = {
-        "close_50_sma": 150,   # 50 SMA 需要 ~150 天确保准确
-        "close_200_sma": 250,  # 200 SMA 需要更长历史数据
-        "close_10_ema": 50,    # 10 EMA 需要足够数据初始化
-        "macd": 50,            # MACD 需要 EMA 计算
-        "macds": 50,
-        "macdh": 50,
-        "rsi": 50,             # RSI 计算需要足够历史数据
-        "boll": 50,            # Bollinger 用 20 SMA + 标准差
-        "boll_ub": 50,
-        "boll_lb": 50,
-        "atr": 50,             # ATR 计算需要足够数据
-        "vwma": 50,
-        "mfi": 50,
-    }
-
     if indicator not in best_ind_params:
         raise ValueError(
             f"Indicator {indicator} is not supported. Please choose from: {list(best_ind_params.keys())}"
         )
 
-    # 自动扩展数据窗口以满足指标最小需求
-    min_required = min_data_window.get(indicator, 30)
-    effective_look_back = max(look_back_days, min_required)
+    # 固定获取1年数据以确保所有指标计算准确（参考 y_finance.py 的做法）
+    # 200 SMA 需要200天，加上缓冲，所以用365天
+    DATA_WINDOW_DAYS = 365
 
-    # 计算日期范围
+    # 计算数据获取范围（用于计算）
     curr_date_dt = datetime.strptime(curr_date, "%Y-%m-%d")
-    before = curr_date_dt - relativedelta(days=effective_look_back)
+    data_start_dt = curr_date_dt - relativedelta(days=DATA_WINDOW_DAYS)
+
+    # 显示范围（用于输出）
+    display_start_dt = curr_date_dt - relativedelta(days=look_back_days)
 
     normalized_symbol = _convert_symbol(symbol)
     ts_code = normalized_symbol
-    start_dt = before.strftime("%Y%m%d")
+    start_dt = data_start_dt.strftime("%Y%m%d")
     end_dt = curr_date_dt.strftime("%Y%m%d")
 
     try:
@@ -190,10 +179,10 @@ def get_stock_stats_indicators_window(
         for _, row in wrapped.iterrows():
             value_by_date[row["Date"].strftime("%Y-%m-%d")] = row.get(indicator)
 
-        # 构建结果
+        # 构建结果（只显示 look_back_days 范围内的数据）
         result_lines = []
         current_dt = curr_date_dt
-        while current_dt >= before:
+        while current_dt >= display_start_dt:
             date_str = current_dt.strftime("%Y-%m-%d")
             ind_value = value_by_date.get(date_str)
             if pd.isna(ind_value):
@@ -204,8 +193,8 @@ def get_stock_stats_indicators_window(
 
         result_str = (
             f"[Tool: get_indicators] [Indicator: {indicator}]\n"
-            f"## {indicator} values from {before.strftime('%Y-%m-%d')} to {curr_date}:\n"
-            f"# 数据窗口: {effective_look_back} 天 (确保指标计算准确)\n\n"
+            f"## {indicator} values from {display_start_dt.strftime('%Y-%m-%d')} to {curr_date}:\n"
+            f"# 计算: 使用1年历史数据确保准确，显示最近 {look_back_days} 天\n\n"
             + "\n".join(result_lines)
             + "\n\n"
             + best_ind_params.get(indicator, "No description available.")
