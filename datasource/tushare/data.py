@@ -101,7 +101,7 @@ def get_stock_stats_indicators_window(
     symbol: Annotated[str, "ticker symbol of the company"],
     indicator: Annotated[str, "technical indicator to get the analysis and report of"],
     curr_date: Annotated[str, "The current trading date you are trading on, YYYY-mm-dd"],
-    look_back_days: Annotated[int, "how many days to look back"],
+    look_back_days: Annotated[int, "how many days to look back"] = 30,
 ) -> str:
     """获取技术指标数据"""
 
@@ -122,14 +122,36 @@ def get_stock_stats_indicators_window(
         "mfi": "MFI: The Money Flow Index.",
     }
 
+    # 指标最小数据窗口需求（确保计算准确）
+    # 注意：stockstats 需要足够的历史数据来初始化计算
+    min_data_window = {
+        "close_50_sma": 150,   # 50 SMA 需要 ~150 天确保准确
+        "close_200_sma": 250,  # 200 SMA 需要更长历史数据
+        "close_10_ema": 50,    # 10 EMA 需要足够数据初始化
+        "macd": 50,            # MACD 需要 EMA 计算
+        "macds": 50,
+        "macdh": 50,
+        "rsi": 50,             # RSI 计算需要足够历史数据
+        "boll": 50,            # Bollinger 用 20 SMA + 标准差
+        "boll_ub": 50,
+        "boll_lb": 50,
+        "atr": 50,             # ATR 计算需要足够数据
+        "vwma": 50,
+        "mfi": 50,
+    }
+
     if indicator not in best_ind_params:
         raise ValueError(
             f"Indicator {indicator} is not supported. Please choose from: {list(best_ind_params.keys())}"
         )
 
+    # 自动扩展数据窗口以满足指标最小需求
+    min_required = min_data_window.get(indicator, 30)
+    effective_look_back = max(look_back_days, min_required)
+
     # 计算日期范围
     curr_date_dt = datetime.strptime(curr_date, "%Y-%m-%d")
-    before = curr_date_dt - relativedelta(days=look_back_days)
+    before = curr_date_dt - relativedelta(days=effective_look_back)
 
     normalized_symbol = _convert_symbol(symbol)
     ts_code = normalized_symbol
@@ -182,7 +204,8 @@ def get_stock_stats_indicators_window(
 
         result_str = (
             f"[Tool: get_indicators] [Indicator: {indicator}]\n"
-            f"## {indicator} values from {before.strftime('%Y-%m-%d')} to {curr_date}:\n\n"
+            f"## {indicator} values from {before.strftime('%Y-%m-%d')} to {curr_date}:\n"
+            f"# 数据窗口: {effective_look_back} 天 (确保指标计算准确)\n\n"
             + "\n".join(result_lines)
             + "\n\n"
             + best_ind_params.get(indicator, "No description available.")
