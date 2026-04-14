@@ -1204,5 +1204,100 @@ def analyze():
     run_analysis()
 
 
+@app.command()
+def test(ticker: str, date: str = None):
+    """自动运行分析（启动 Dashboard → 分析 → 关闭）
+
+    一条命令完成：启动 Dashboard、调用分析 API、自动关闭端口。
+    分析结果保存在 results/{ticker}/{date}/dashboard_*/reports/
+    """
+    import subprocess
+    import socket
+    import time
+    import requests
+
+    # 1. 找可用端口
+    with socket.socket() as s:
+        s.bind(("", 0))
+        port = s.getsockname()[1]
+
+    date = date or datetime.datetime.now().strftime("%Y-%m-%d")
+
+    console.print(f"[cyan]启动 Dashboard (端口 {port})...[/cyan]")
+    proc = subprocess.Popen(
+        ["uv", "run", "python", "-m", "web", "--port", str(port)],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+
+    # 2. 等待 Dashboard 就绪
+    console.print("[cyan]等待 Dashboard 就绪...[/cyan]")
+    for _ in range(60):
+        try:
+            requests.get(f"http://localhost:{port}/api/options", timeout=1)
+            break
+        except requests.exceptions.ConnectionError:
+            time.sleep(0.5)
+    else:
+        proc.terminate()
+        console.print("[red]Dashboard 启动超时[/red]")
+        raise SystemExit(1)
+
+    console.print(f"[green]Dashboard 已启动，端口 {port}[/green]")
+
+    # 3. 调用 API
+    console.print(f"[cyan]开始分析 {ticker} {date}...[/cyan]")
+    try:
+        resp = requests.post(
+            f"http://localhost:{port}/api/start",
+            json={
+                "ticker": ticker,
+                "analysis_date": date,
+                "output_language": "Chinese",
+            },
+            timeout=10,
+        )
+        if resp.status_code != 202:
+            console.print(f"[red]API 调用失败: {resp.status_code} {resp.text}[/red]")
+            proc.terminate()
+            raise SystemExit(1)
+    except requests.RequestException as e:
+        console.print(f"[red]请求失败: {e}[/red]")
+        proc.terminate()
+        raise SystemExit(1)
+
+    # 4. 等待完成
+    console.print("[cyan]等待分析完成...[/cyan]")
+    start_time = time.time()
+    while True:
+        time.sleep(2)
+        try:
+            state_resp = requests.get(f"http://localhost:{port}/api/state", timeout=5)
+            state = state_resp.json()
+            status = state.get("status", "unknown")
+
+            elapsed = int(time.time() - start_time)
+            if status == "running":
+                console.print(f"\r[yellow]分析中... ({elapsed}s)[/yellow]", end="")
+            elif status == "completed":
+                results_path = state.get("results_path", "")
+                console.print(f"\n[green]分析完成！耗时 {elapsed}s[/green]")
+                if results_path:
+                    console.print(f"[green]结果目录: {results_path}[/green]")
+                break
+            elif status in ("idle", "error", "stopped"):
+                error = state.get("error", "")
+                console.print(f"\n[red]分析失败或已停止: {status} {error}[/red]")
+                break
+        except requests.RequestException:
+            pass
+
+    # 5. 关闭 Dashboard
+    console.print("[cyan]关闭 Dashboard...[/cyan]")
+    proc.terminate()
+    proc.wait(timeout=5)
+    console.print("[green]完成[/green]")
+
+
 if __name__ == "__main__":
     app()

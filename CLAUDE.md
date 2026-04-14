@@ -1,27 +1,30 @@
 # TradingAgents
 
+多智能体 LLM 金融交易框架。
+
 ## 快速运行
 
+### CLI 自动化（推荐给 LLM 测试）
+
 ```bash
-# 单股票分析（API 调用，生成本地日志）
-# 1. 启动 dashboard 服务
-uv run python -m web
-
-# 2. 调用 API 触发分析（另开终端）
-curl -X POST http://localhost:8765/api/start \
-  -H "Content-Type: application/json" \
-  -d '{
-    "ticker": "688333.SH",
-    "analysis_date": "2026-04-14",
-    "analysts": ["market", "social", "news", "fundamentals"],
-    "output_language": "Chinese"
-  }'
-
-# output_language 支持: Chinese, English, Japanese 等
-# 设置为 Chinese 会启用翻译功能
-
-# 结果目录：results/688333.SH/2026-04-14/dashboard_YYYYMMDD_HHMMSS/
+# 一条命令：启动 Dashboard → 分析 → 关闭端口
+tradingagents test 688333.SH --date 2026-04-14
 ```
+
+### Dashboard 网页
+
+```bash
+uv run python -m web
+# 浏览器打开 http://localhost:8765
+```
+
+### CLI 交互式
+
+```bash
+tradingagents analyze
+```
+
+**结果目录**：`results/{ticker}/{date}/dashboard_*/reports/`
 
 ## 环境配置
 
@@ -37,39 +40,32 @@ curl -X POST http://localhost:8765/api/start \
 | `agents_registry.yaml` | 智能体工具绑定 |
 | `tools_registry.yaml` | 工具定义 |
 
-详见 [docs/dataflow-architecture.md](docs/dataflow-architecture.md)
-
-## 智能体
-
-| 角色 | 功能 |
-|------|------|
-| 基本面分析师 | 财务分析 |
-| 技术分析师 | 技术指标 |
-| 新闻分析师 | 新闻影响 |
-| 研究员 | 多空辩论 |
-| 风险评估 | 风险分析 |
-| 投资组合经理 | 最终审批 |
-
-## 添加工具
-
-加工具只改配置，不改代码。
-
-详见 [docs/agent-tools-configuration.md](docs/agent-tools-configuration.md)
-
-```yaml
-# agents_registry.yaml
-- name: get_new_metric
-  usage: "Use for XYZ analysis"
-```
-
 ## 目录结构
 
 ```
 TradingAgents/
-├── datasource/tushare/    # A股数据源
-├── tradingagents/         # 核心库
-│   ├── agents/            # 智能体
+├── cli/                    # CLI 入口（analyze 交互 / test 自动化）
+├── web/                    # Dashboard HTTP 服务（端口 8765）
+├── tradingagents/          # 核心库
+│   ├── agents/            # 智能体实现
+│   │   ├── analysts/      # 市场/新闻/基本面/情绪分析师
+│   │   └── utils/        # 工具（indicator_docs_loader.py 动态加载指标）
 │   ├── dataflows/         # @auto_tool 装饰器
 │   └── config/            # 配置文件
-└── docs/                  # 文档
+├── datasource/tushare/    # A股数据源
+└── docs/                  # 详细文档
 ```
+
+## 核心文件
+
+- `tradingagents/agents/analysts/market_analyst.py` - 市场分析师（含动态指标加载）
+- `tradingagents/agents/utils/indicator_docs_loader.py` - 从 tools_registry.yaml 动态读取指标文档
+- `web/dashboard.py` - Dashboard HTTP API（POST /api/start, GET /api/state）
+
+## 详细文档
+
+- [docs/agent-architecture.md](docs/agent-architecture.md) - 智能体架构与辩论机制
+- [docs/dataflow-architecture.md](docs/dataflow-architecture.md) - 数据流架构
+- [docs/graph-execution.md](docs/graph-execution.md) - LangGraph 执行流程
+- [docs/agent-tools-configuration.md](docs/agent-tools-configuration.md) - 工具配置
+- [docs/indicator_analysis_final_report.md](docs/indicator_analysis_final_report.md) - 技术指标修复报告

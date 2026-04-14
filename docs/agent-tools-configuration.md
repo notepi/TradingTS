@@ -131,7 +131,7 @@ def get_peg_ratio(ticker: str, curr_date: str = None):
 # datasource/tushare/indicators/lynch.py
 from tradingagents.dataflows.decorators import auto_tool
 
-@auto_tool(description="Lynch 分类 - 判断公司类型")
+@auto_tool(description="Lynch 公司分类 - 判断公司类型")
 def get_lynch_category(ticker: str, curr_date: str = None):
     """Peter Lynch 公司分类分析"""
     # 实现逻辑
@@ -173,38 +173,44 @@ print(build_tools_usage('fundamentals_analyst'))
 "
 ```
 
-## 文件结构
+## 工具列表
 
-```
-tradingagents/
-├── config/
-│   ├── config.yaml              # vendor_paths + data_vendors
-│   ├── tools_registry.yaml      # 工具定义（category + vendors）
-│   └── agents_registry.yaml     # 智能体工具绑定
-├── dataflows/
-│   ├── decorators.py            # @auto_tool 装饰器 + TOOL_REGISTRY
-│   ├── interface.py             # discover_and_register() + route_to_vendor()
-│   └── yfinance_news.py         # yfinance 新闻实现
-├── agents/
-│   ├── utils/
-│   │   └── agent_utils.py       # load_agent_tools(), build_tools_usage()
-│   └── analysts/
-│       └── fundamentals_analyst.py  # prompt 自动追加 usage
-│       └── market_analyst.py
-│       └── news_analyst.py
-│       └── social_analyst.py
-└── graph/
-    └── trading_graph.py         # ToolNode(load_agent_tools(...))
-```
+### 技术指标（get_indicators）
 
-## 数据源切换
+| 指标 | 说明 | 数据源 |
+|------|------|--------|
+| close_10_ema | 10日指数移动平均 | tushare/yfinance |
+| close_50_sma | 50日简单移动平均 | tushare/yfinance |
+| close_200_sma | 200日简单移动平均 | tushare/yfinance |
+| macd/macds/macdh | MACD 系列 | tushare/yfinance/alpha_vantage |
+| rsi | 相对强弱指数 | tushare/yfinance/alpha_vantage |
+| mfi | 资金流量指数 | tushare |
+| cci | 顺势指标 | tushare |
+| wr | 威廉指标 | tushare |
+| kdjk/kdjd/kdjj | KDJ 随机指标 | tushare |
+| boll/boll_ub/boll_lb | 布林带 | tushare/yfinance/alpha_vantage |
+| atr | 平均真实波幅 | tushare |
+| vwma | 成交量加权移动平均 | tushare |
 
-切换数据源（如从 tushare 到 akshare）只需：
+### 基本面数据
 
-| 步骤 | 文件 | 操作 |
-|------|------|------|
-| 1 | `datasource/akshare/` | 创建目录 + 实现同名函数 |
-| 2 | `tools_registry.yaml` | vendors 添加 `akshare` |
-| 3 | `config.yaml` | vendor_paths + data_vendors 配置 |
+| 工具 | 说明 | 数据源 |
+|------|------|--------|
+| get_fundamentals | 核心财务指标 | tushare/yfinance/alpha_vantage |
+| get_balance_sheet | 资产负债表 | tushare/yfinance |
+| get_cashflow | 现金流量表 | tushare/yfinance |
+| get_income_statement | 利润表 | tushare/yfinance |
+| get_peg_ratio | PEG 估值 | tushare |
+| get_yoy_growth | 同比增长率 | tushare |
 
-详见 [docs/dataflow-architecture.md](docs/dataflow-architecture.md)。
+### 新闻数据
+
+| 工具 | 说明 | 数据源 |
+|------|------|--------|
+| get_news | 股票新闻 | yfinance/alpha_vantage |
+| get_global_news | 全球市场新闻 | yfinance |
+| get_insider_transactions | 内部交易 | yfinance |
+
+---
+
+*最后更新：2026-04-14*

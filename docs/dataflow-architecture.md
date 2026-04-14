@@ -62,6 +62,27 @@ tools:
     vendors: [tushare, yfinance, alpha_vantage]  # 多数据源可选
 ```
 
+### get_indicators 特殊配置
+
+`get_indicators` 是唯一有 `vendors` + `indicators` + `indicator_docs` 嵌套结构的工具：
+
+```yaml
+get_indicators:
+  category: technical_indicators
+  description: "技术指标工具..."
+  vendors:
+    tushare:
+      indicators: [close_10_ema, close_50_sma, ...]  # 支持的指标列表
+      indicator_docs: |                               # 指标说明文档
+        ## 移动平均线
+        | close_10_ema | 10日指数移动平均，短周期快速均线 |
+        ...
+    yfinance:
+      indicators: [macd, rsi, boll, adx, sma, ema]
+```
+
+**注意**: `indicator_docs` 目前**未被代码读取**（见 `indicator_analysis_report.md`）。
+
 ## 数据源切换
 
 ### Category 级别切换
@@ -217,6 +238,23 @@ _VENDOR_REGISTRY["get_peg_ratio"]["tushare"]
 执行函数 → 返回结果
 ```
 
+## 自动发现机制 (discover_and_register)
+
+启动时自动扫描 `vendor_paths` 中的模块并注册：
+
+```python
+# tradingagents/dataflows/interface.py
+
+_VENDOR_REGISTRY = {}  # 结构: {method: {vendor: function}}
+
+def discover_and_register():
+    """模块加载时自动执行"""
+    # 1. 读取 tools_registry.yaml
+    # 2. 遍历 vendor_paths
+    # 3. 用 importlib.import_module 动态导入
+    # 4. 调用 register_vendor(method, vendor, func)
+```
+
 ## Fallback 机制
 
 ```yaml
@@ -226,6 +264,8 @@ data_vendors:
 ```
 
 当 tushare 失败时，自动切换到 yfinance。
+
+**触发条件**: 目前只处理 `AlphaVantageRateLimitError`，其他异常不会触发 fallback。
 
 ## 文件结构总览
 
@@ -277,4 +317,4 @@ TradingAgents/
 
 ---
 
-*最后更新：2026-04-13*
+*最后更新：2026-04-14*
