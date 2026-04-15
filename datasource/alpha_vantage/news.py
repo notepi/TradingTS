@@ -1,6 +1,6 @@
-from .alpha_vantage_common import _make_api_request, format_datetime_for_api
+from .common import _make_api_request
 
-def get_news(ticker, start_date, end_date) -> dict[str, str] | str:
+def get_news(ticker: str, start_date: str, end_date: str) -> dict[str, str] | str:
     """Returns live and historical market news & sentiment data from premier news outlets worldwide.
 
     Covers stocks, cryptocurrencies, forex, and topics like fiscal policy, mergers & acquisitions, IPOs.
@@ -16,13 +16,13 @@ def get_news(ticker, start_date, end_date) -> dict[str, str] | str:
 
     params = {
         "tickers": ticker,
-        "time_from": format_datetime_for_api(start_date),
-        "time_to": format_datetime_for_api(end_date),
+        "time_from": _format_datetime_for_api(start_date),
+        "time_to": _format_datetime_for_api(end_date),
     }
 
     return _make_api_request("NEWS_SENTIMENT", params)
 
-def get_global_news(curr_date, look_back_days: int = 7, limit: int = 50) -> dict[str, str] | str:
+def get_global_news(curr_date: str, look_back_days: int = 7, limit: int = 50) -> dict[str, str] | str:
     """Returns global market news & sentiment data without ticker-specific filtering.
 
     Covers broad market topics like financial markets, economy, and more.
@@ -44,8 +44,8 @@ def get_global_news(curr_date, look_back_days: int = 7, limit: int = 50) -> dict
 
     params = {
         "topics": "financial_markets,economy_macro,economy_monetary",
-        "time_from": format_datetime_for_api(start_date),
-        "time_to": format_datetime_for_api(curr_date),
+        "time_from": _format_datetime_for_api(start_date),
+        "time_to": _format_datetime_for_api(curr_date),
         "limit": str(limit),
     }
 
@@ -69,3 +69,24 @@ def get_insider_transactions(symbol: str) -> dict[str, str] | str:
     }
 
     return _make_api_request("INSIDER_TRANSACTIONS", params)
+
+
+def _format_datetime_for_api(date_input) -> str:
+    """Convert various date formats to YYYYMMDDTHHMM format required by Alpha Vantage API."""
+    from datetime import datetime
+    if isinstance(date_input, str):
+        if len(date_input) == 13 and 'T' in date_input:
+            return date_input
+        try:
+            dt = datetime.strptime(date_input, "%Y-%m-%d")
+            return dt.strftime("%Y%m%dT0000")
+        except ValueError:
+            try:
+                dt = datetime.strptime(date_input, "%Y-%m-%d %H:%M")
+                return dt.strftime("%Y%m%dT%H%M")
+            except ValueError:
+                raise ValueError(f"Unsupported date format: {date_input}")
+    elif isinstance(date_input, datetime):
+        return date_input.strftime("%Y%m%dT%H%M")
+    else:
+        raise ValueError(f"Date must be string or datetime object, got {type(date_input)}")

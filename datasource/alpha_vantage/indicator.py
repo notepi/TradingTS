@@ -1,6 +1,6 @@
-from .alpha_vantage_common import _make_api_request
+from .common import _make_api_request
 
-def get_indicator(
+def get_indicators(
     symbol: str,
     indicator: str,
     curr_date: str,
@@ -28,18 +28,18 @@ def get_indicator(
     from dateutil.relativedelta import relativedelta
 
     supported_indicators = {
-        "close_50_sma": ("50 SMA", "close"),
-        "close_200_sma": ("200 SMA", "close"),
-        "close_10_ema": ("10 EMA", "close"),
-        "macd": ("MACD", "close"),
-        "macds": ("MACD Signal", "close"),
-        "macdh": ("MACD Histogram", "close"),
-        "rsi": ("RSI", "close"),
-        "boll": ("Bollinger Middle", "close"),
-        "boll_ub": ("Bollinger Upper Band", "close"),
-        "boll_lb": ("Bollinger Lower Band", "close"),
-        "atr": ("ATR", None),
-        "vwma": ("VWMA", "close")
+        "close_50_sma": ("SMA", "50", "close"),
+        "close_200_sma": ("SMA", "200", "close"),
+        "close_10_ema": ("EMA", "10", "close"),
+        "macd": ("MACD", None, "close"),
+        "macds": ("MACD", None, "close"),
+        "macdh": ("MACD", None, "close"),
+        "rsi": ("RSI", str(time_period), "close"),
+        "boll": ("BBANDS", "20", "close"),
+        "boll_ub": ("BBANDS", "20", "close"),
+        "boll_lb": ("BBANDS", "20", "close"),
+        "atr": ("ATR", str(time_period), None),
+        "vwma": ("VWMA", None, "close")
     }
 
     indicator_descriptions = {
@@ -65,86 +65,62 @@ def get_indicator(
     curr_date_dt = datetime.strptime(curr_date, "%Y-%m-%d")
     before = curr_date_dt - relativedelta(days=look_back_days)
 
-    # Get the full data for the period instead of making individual calls
-    _, required_series_type = supported_indicators[indicator]
+    av_func, av_time_period, required_series_type = supported_indicators[indicator]
 
     # Use the provided series_type or fall back to the required one
     if required_series_type:
         series_type = required_series_type
 
     try:
-        # Get indicator data for the period
-        if indicator == "close_50_sma":
+        # Build API params based on function type
+        if av_func == "SMA":
             data = _make_api_request("SMA", {
                 "symbol": symbol,
                 "interval": interval,
-                "time_period": "50",
+                "time_period": av_time_period,
                 "series_type": series_type,
                 "datatype": "csv"
             })
-        elif indicator == "close_200_sma":
-            data = _make_api_request("SMA", {
-                "symbol": symbol,
-                "interval": interval,
-                "time_period": "200",
-                "series_type": series_type,
-                "datatype": "csv"
-            })
-        elif indicator == "close_10_ema":
+        elif av_func == "EMA":
             data = _make_api_request("EMA", {
                 "symbol": symbol,
                 "interval": interval,
-                "time_period": "10",
+                "time_period": av_time_period,
                 "series_type": series_type,
                 "datatype": "csv"
             })
-        elif indicator == "macd":
+        elif av_func == "MACD":
             data = _make_api_request("MACD", {
                 "symbol": symbol,
                 "interval": interval,
                 "series_type": series_type,
                 "datatype": "csv"
             })
-        elif indicator == "macds":
-            data = _make_api_request("MACD", {
-                "symbol": symbol,
-                "interval": interval,
-                "series_type": series_type,
-                "datatype": "csv"
-            })
-        elif indicator == "macdh":
-            data = _make_api_request("MACD", {
-                "symbol": symbol,
-                "interval": interval,
-                "series_type": series_type,
-                "datatype": "csv"
-            })
-        elif indicator == "rsi":
+        elif av_func == "RSI":
             data = _make_api_request("RSI", {
                 "symbol": symbol,
                 "interval": interval,
-                "time_period": str(time_period),
+                "time_period": av_time_period,
                 "series_type": series_type,
                 "datatype": "csv"
             })
-        elif indicator in ["boll", "boll_ub", "boll_lb"]:
+        elif av_func == "BBANDS":
             data = _make_api_request("BBANDS", {
                 "symbol": symbol,
                 "interval": interval,
-                "time_period": "20",
+                "time_period": av_time_period,
                 "series_type": series_type,
                 "datatype": "csv"
             })
-        elif indicator == "atr":
+        elif av_func == "ATR":
             data = _make_api_request("ATR", {
                 "symbol": symbol,
                 "interval": interval,
-                "time_period": str(time_period),
+                "time_period": av_time_period,
                 "datatype": "csv"
             })
-        elif indicator == "vwma":
-            # Alpha Vantage doesn't have direct VWMA, so we'll return an informative message
-            # In a real implementation, this would need to be calculated from OHLCV data
+        elif av_func == "VWMA":
+            # Alpha Vantage doesn't have direct VWMA
             return f"## VWMA (Volume Weighted Moving Average) for {symbol}:\n\nVWMA calculation requires OHLCV data and is not directly available from Alpha Vantage API.\nThis indicator would need to be calculated from the raw stock data using volume-weighted price averaging.\n\n{indicator_descriptions.get('vwma', 'No description available.')}"
         else:
             return f"Error: Indicator {indicator} not implemented yet."

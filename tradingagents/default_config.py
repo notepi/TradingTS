@@ -67,3 +67,19 @@ if "backend_url" in _yaml:
 # 合并 vendor_paths（如 yaml 有定义）
 if "vendor_paths" in _yaml:
     DEFAULT_CONFIG["vendor_paths"] = _yaml["vendor_paths"]
+
+# 合并 tool_vendors（如 yaml 有定义）
+if "tool_vendors" in _yaml:
+    DEFAULT_CONFIG["tool_vendors"] = _yaml["tool_vendors"]
+
+# 合并 output_language（从 output.language 路径）
+if "output" in _yaml and "language" in _yaml["output"]:
+    DEFAULT_CONFIG["output_language"] = _yaml["output"]["language"]
+
+# 合并辩论相关配置
+if "max_debate_rounds" in _yaml:
+    DEFAULT_CONFIG["max_debate_rounds"] = _yaml["max_debate_rounds"]
+if "max_risk_discuss_rounds" in _yaml:
+    DEFAULT_CONFIG["max_risk_discuss_rounds"] = _yaml["max_risk_discuss_rounds"]
+if "max_recur_limit" in _yaml:
+    DEFAULT_CONFIG["max_recur_limit"] = _yaml["max_recur_limit"]

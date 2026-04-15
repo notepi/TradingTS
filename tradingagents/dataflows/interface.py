@@ -93,8 +93,9 @@ def discover_and_register():
                     if func:
                         register_vendor(tool_name, vendor, func)
 
-            except (ImportError, AttributeError):
-                pass  # vendor 未实现此工具，跳过
+            except (ImportError, AttributeError) as e:
+                import logging
+                logging.debug(f"Vendor {vendor} does not implement {tool_name}: {e}")
 
 
 # 启动时自动执行发现和注册

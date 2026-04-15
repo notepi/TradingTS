@@ -1,9 +1,8 @@
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from tradingagents.agents.utils.agent_utils import (
     build_instrument_context,
-    get_indicators,
+    load_agent_tools,
     get_language_instruction,
-    get_stock_data,
 )
 from tradingagents.agents.utils.indicator_docs_loader import get_indicator_docs
 from tradingagents.dataflows.config import get_config
@@ -15,10 +14,7 @@ def create_market_analyst(llm):
         current_date = state["trade_date"]
         instrument_context = build_instrument_context(state["company_of_interest"])
 
-        tools = [
-            get_stock_data,
-            get_indicators,
-        ]
+        tools = load_agent_tools("market_analyst")
 
         # 动态加载指标文档
         indicator_docs = get_indicator_docs()

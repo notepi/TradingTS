@@ -81,7 +81,7 @@ get_indicators:
       indicators: [macd, rsi, boll, adx, sma, ema]
 ```
 
-**注意**: `indicator_docs` 目前**未被代码读取**（见 `indicator_analysis_report.md`）。
+**注意**: `indicator_docs` 已被 `indicator_docs_loader.py` 动态读取（见 `market_analyst.py`）。
 
 ## 数据源切换
 

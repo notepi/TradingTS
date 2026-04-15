@@ -1,13 +1,28 @@
 """
 tradingagents.dataflows - 数据流路由层
 
-启动时自动发现并注册各数据源的函数实现。
+启动时自动发现并注册各数据源的函数实现（通过 interface.py）。
+数据源位于 datasource/ 目录。
 """
 
-# 导入 yfinance 新闻函数，触发 @auto_tool 注册
-from .yfinance_news import get_news, get_global_news
+from .interface import (
+    discover_and_register,
+    route_to_vendor,
+    get_vendor,
+    get_category_for_method,
+    _VENDOR_REGISTRY,
+    TOOLS_CATEGORIES,
+)
+
+from .decorators import auto_tool, TOOL_REGISTRY
 
 __all__ = [
-    "get_news",
-    "get_global_news",
+    "discover_and_register",
+    "route_to_vendor",
+    "get_vendor",
+    "get_category_for_method",
+    "_VENDOR_REGISTRY",
+    "TOOLS_CATEGORIES",
+    "auto_tool",
+    "TOOL_REGISTRY",
 ]

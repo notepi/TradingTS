@@ -5,7 +5,7 @@ from datetime import datetime
 from dateutil.relativedelta import relativedelta
 
 from .stockstats_utils import yf_retry
-from .decorators import auto_tool
+from tradingagents.dataflows.decorators import auto_tool
 
 
 def _extract_article_data(article: dict) -> dict:

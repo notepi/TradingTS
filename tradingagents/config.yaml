@@ -24,5 +24,6 @@ tool_vendors: {}
 # 数据源路径配置（支持自定义路径）
 vendor_paths:
   tushare: "datasource.tushare"
-  yfinance: "tradingagents.dataflows"
+  yfinance: "datasource.yfinance"
+  alpha_vantage: "datasource.alpha_vantage"
   # my_metrics: "/path/to/my_metrics"
