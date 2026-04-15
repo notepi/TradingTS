@@ -15,6 +15,10 @@ from .stock import (
     get_insider_transactions,
 )
 
+# 别名映射（兼容 route_to_vendor 的函数名）
+get_stock_data = get_YFin_data_online
+get_indicators = get_stock_stats_indicators_window
+
 __all__ = [
     "get_news",
     "get_global_news",
