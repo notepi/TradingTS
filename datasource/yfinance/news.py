@@ -67,7 +67,12 @@ def get_news(
         Formatted string containing news articles
     """
     try:
-        stock = yf.Ticker(ticker)
+        # yfinance doesn't support .SH/.SS suffix for A-shares, try without it
+        yf_ticker = ticker
+        if ticker.endswith('.SH') or ticker.endswith('.SS'):
+            yf_ticker = ticker.rsplit('.', 1)[0]
+
+        stock = yf.Ticker(yf_ticker)
         news = yf_retry(lambda: stock.get_news(count=20))
 
         if not news:
@@ -98,7 +103,20 @@ def get_news(
             filtered_count += 1
 
         if filtered_count == 0:
-            return f"No news found for {ticker} between {start_date} and {end_date}"
+            # Fall back to returning all available news if date range filter yields nothing
+            # (yfinance may return generic articles for certain tickers like A-shares)
+            news_str = ""
+            for article in news:
+                data = _extract_article_data(article)
+                news_str += f"### {data['title']} (source: {data['publisher']})\n"
+                if data["summary"]:
+                    news_str += f"{data['summary']}\n"
+                if data["link"]:
+                    news_str += f"Link: {data['link']}\n"
+                news_str += "\n"
+
+            if news_str:
+                return f"## {ticker} News (showing available, date range filter relaxed):\n\n{news_str}"
 
         return f"## {ticker} News, from {start_date} to {end_date}:\n\n{news_str}"
 

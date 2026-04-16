@@ -58,6 +58,10 @@ class TradingAgentsGraph:
         # Update the interface's config
         set_config(self.config)
 
+        # 初始化数据流：发现并注册所有数据源工具
+        from tradingagents.dataflows import discover_and_register
+        discover_and_register()
+
         # Create necessary directories
         os.makedirs(
             os.path.join(self.config["project_dir"], "dataflows/data_cache"),
@@ -114,7 +118,7 @@ class TradingAgentsGraph:
             self.conditional_logic,
         )
 
-        self.propagator = Propagator()
+        self.propagator = Propagator(max_recur_limit=self.config["max_recur_limit"])
         self.reflector = Reflector(self.quick_thinking_llm)
         self.signal_processor = SignalProcessor(self.quick_thinking_llm)
 

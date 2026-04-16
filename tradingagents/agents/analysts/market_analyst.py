@@ -17,7 +17,10 @@ def create_market_analyst(llm):
         tools = load_agent_tools("market_analyst")
 
         # 动态加载指标文档
-        indicator_docs = get_indicator_docs()
+        from tradingagents.dataflows.interface import get_vendor, get_category_for_method
+        category = get_category_for_method("get_indicators")
+        vendor = get_vendor(category, "get_indicators")
+        indicator_docs = get_indicator_docs(vendor)
 
         system_message = (
             """You are a trading assistant tasked with analyzing financial markets. Your role is to select the **most relevant indicators** for a given market condition or trading strategy from the following list. The goal is to choose up to **12 indicators** that provide complementary insights without redundancy.

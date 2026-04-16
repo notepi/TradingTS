@@ -22,6 +22,8 @@ def test_alpha_vantage_datasource_exists():
 
 def test_discover_and_register_finds_yfinance():
     """验证 discover_and_register 能发现 datasource/yfinance 下的工具"""
+    from tradingagents.dataflows import discover_and_register
+    discover_and_register()
     from tradingagents.dataflows.interface import _VENDOR_REGISTRY
 
     # 检查 yfinance 是否在 vendor registry 中
@@ -36,6 +38,8 @@ def test_discover_and_register_finds_yfinance():
 
 def test_discover_and_register_finds_alpha_vantage():
     """验证 discover_and_register 能发现 datasource/alpha_vantage 下的工具"""
+    from tradingagents.dataflows import discover_and_register
+    discover_and_register()
     from tradingagents.dataflows.interface import _VENDOR_REGISTRY
 
     # 检查 alpha_vantage 是否在 vendor registry 中

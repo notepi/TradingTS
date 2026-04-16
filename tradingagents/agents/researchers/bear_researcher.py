@@ -1,5 +1,10 @@
 
 
+DATA_ACCURACY_INSTRUCTION = """
+DATA ACCURACY: Quote EXACT numbers from the reports. Cite sources: "fundamentals_report: inventory = 14.50 billion"
+"""
+
+
 def create_bear_researcher(llm, memory):
     def bear_node(state) -> dict:
         investment_debate_state = state["investment_debate_state"]
@@ -28,6 +33,8 @@ Key points to focus on:
 - Negative Indicators: Use evidence from financial data, market trends, or recent adverse news to support your position.
 - Bull Counterpoints: Critically analyze the bull argument with specific data and sound reasoning, exposing weaknesses or over-optimistic assumptions.
 - Engagement: Present your argument in a conversational style, directly engaging with the bull analyst's points and debating effectively rather than simply listing facts.
+
+{DATA_ACCURACY_INSTRUCTION}
 
 Resources available:
 

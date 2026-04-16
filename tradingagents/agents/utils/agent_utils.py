@@ -1,37 +1,22 @@
 from langchain_core.messages import HumanMessage, RemoveMessage
 import yaml
+import importlib
 from pathlib import Path
 
-# Import tools from separate utility files
-from tradingagents.agents.utils.core_stock_tools import (
-    get_stock_data
-)
-from tradingagents.agents.utils.technical_indicators_tools import (
-    get_indicators
-)
-from tradingagents.agents.utils.fundamental_data_tools import (
-    get_fundamentals,
-    get_balance_sheet,
-    get_cashflow,
-    get_income_statement
-)
-from tradingagents.agents.utils.news_data_tools import (
-    get_news,
-    get_insider_transactions,
-    get_global_news
-)
-
-# Legacy tool map (for backward compatibility)
-LEGACY_TOOL_MAP = {
-    "get_stock_data": get_stock_data,
-    "get_indicators": get_indicators,
-    "get_fundamentals": get_fundamentals,
-    "get_balance_sheet": get_balance_sheet,
-    "get_cashflow": get_cashflow,
-    "get_income_statement": get_income_statement,
-    "get_news": get_news,
-    "get_insider_transactions": get_insider_transactions,
-    "get_global_news": get_global_news,
+# 工具名到模块的映射（用于按需导入触发 @auto_tool 注册）
+TOOL_MODULES = {
+    "get_stock_data": "tradingagents.agents.utils.core_stock_tools",
+    "get_indicators": "tradingagents.agents.utils.technical_indicators_tools",
+    "get_fundamentals": "tradingagents.agents.utils.fundamental_data_tools",
+    "get_balance_sheet": "tradingagents.agents.utils.fundamental_data_tools",
+    "get_cashflow": "tradingagents.agents.utils.fundamental_data_tools",
+    "get_income_statement": "tradingagents.agents.utils.fundamental_data_tools",
+    "get_news": "tradingagents.agents.utils.news_data_tools",
+    "get_global_news": "tradingagents.agents.utils.news_data_tools",
+    "get_insider_transactions": "tradingagents.agents.utils.news_data_tools",
+    # datasource 层工具（通过 @auto_tool 注册）
+    "get_peg_ratio": "datasource.tushare.indicators.enhanced_data",
+    "get_yoy_growth": "datasource.tushare.indicators.enhanced_data",
 }
 
 
@@ -46,8 +31,8 @@ def load_agents_registry() -> dict:
 def load_agent_tools(agent_name: str) -> list:
     """从配置加载智能体工具列表。
 
-    优先从 TOOL_REGISTRY（装饰器注册）获取，
-    未找到则 fallback 到 LEGACY_TOOL_MAP。
+    所有工具必须通过 @auto_tool 装饰器注册到 TOOL_REGISTRY。
+    如果工具未注册，会自动导入对应模块触发注册。
 
     Args:
         agent_name: 智能体名称（如 fundamentals_analyst）
@@ -73,14 +58,18 @@ def load_agent_tools(agent_name: str) -> list:
         else:
             name = tool_item
 
-        # 优先用装饰器注册的 tool
+        # 如果工具未注册，尝试导入对应模块触发 @auto_tool
+        if name not in TOOL_REGISTRY:
+            if name in TOOL_MODULES:
+                importlib.import_module(TOOL_MODULES[name])
+            else:
+                raise KeyError(f"Tool '{name}' not in TOOL_MODULES mapping")
+
+        # 再次检查注册状态
         if name in TOOL_REGISTRY:
             tools.append(TOOL_REGISTRY[name])
-        # fallback 到 legacy tool
-        elif name in LEGACY_TOOL_MAP:
-            tools.append(LEGACY_TOOL_MAP[name])
         else:
-            raise KeyError(f"Tool '{name}' not found in TOOL_REGISTRY or LEGACY_TOOL_MAP")
+            raise KeyError(f"Tool '{name}' not found in TOOL_REGISTRY after module import")
 
     return tools
 

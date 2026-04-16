@@ -77,3 +77,59 @@ def test_all_analysts_use_load_agent_tools():
         "news_analyst should use load_agent_tools()"
     assert 'get_news,' not in news_source, \
         "news_analyst should not hardcode get_news"
+
+
+# ===== 设计一致性测试（方案C）=====
+
+def test_all_tools_in_tool_registry():
+    """验证所有配置的工具都在 TOOL_REGISTRY（单一机制）"""
+    from tradingagents.agents.utils.agent_utils import load_agent_tools, load_agents_registry
+    from tradingagents.dataflows.decorators import TOOL_REGISTRY
+
+    registry = load_agents_registry()
+
+    # 遍历所有 agent 配置的工具
+    for agent_name, agent_config in registry.get("agents", {}).items():
+        tools_config = agent_config.get("tools", [])
+        for tool_item in tools_config:
+            name = tool_item.get("name") if isinstance(tool_item, dict) else tool_item
+
+            # 先导入模块触发注册
+            load_agent_tools(agent_name)
+
+            # 验证在 TOOL_REGISTRY 中
+            assert name in TOOL_REGISTRY, \
+                f"Tool '{name}' not in TOOL_REGISTRY - violates single mechanism design"
+
+
+def test_no_legacy_fallback():
+    """验证 load_agent_tools() 不触发 DeprecationWarning"""
+    import warnings
+    from tradingagents.agents.utils.agent_utils import load_agent_tools
+
+    # 捕获所有警告
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+
+        # 加载所有 agent 的工具
+        for agent in ["market_analyst", "social_analyst", "news_analyst", "fundamentals_analyst"]:
+            load_agent_tools(agent)
+
+        # 检查没有 DeprecationWarning
+        deprecation_warnings = [x for x in w if issubclass(x.category, DeprecationWarning)]
+        assert len(deprecation_warnings) == 0, \
+            f"DeprecationWarning triggered: {[str(x.message) for x in deprecation_warnings]}"
+
+
+def test_auto_tool_registration():
+    """验证 @auto_tool 函数自动注册到 TOOL_REGISTRY"""
+    from tradingagents.dataflows.decorators import TOOL_REGISTRY
+
+    # 导入模块触发注册
+    import tradingagents.agents.utils.core_stock_tools
+    import tradingagents.agents.utils.news_data_tools
+
+    # 检查关键工具已注册
+    assert "get_stock_data" in TOOL_REGISTRY, "get_stock_data should be registered via @auto_tool"
+    assert "get_news" in TOOL_REGISTRY, "get_news should be registered via @auto_tool"
+    assert "get_global_news" in TOOL_REGISTRY, "get_global_news should be registered via @auto_tool"

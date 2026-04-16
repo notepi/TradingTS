@@ -14,8 +14,19 @@ from .config import get_config
 
 
 # 动态生成的注册表（启动时填充）
-TOOLS_CATEGORIES: dict[str, dict] = {}
 _VENDOR_REGISTRY: dict[str, dict[str, Callable]] = {}
+TOOLS_CATEGORIES: dict[str, dict] = {}
+_registered = False
+
+
+def _ensure_registered():
+    """惰性初始化：首次访问时触发 discover_and_register()"""
+    global _registered
+    if not _registered:
+        # 先确保 config 已初始化
+        get_config()
+        _discover_and_register_impl()
+        _registered = True
 
 
 def load_tools_registry() -> dict:
@@ -36,10 +47,12 @@ def load_tools_registry() -> dict:
 
 def register_vendor(method: str, vendor: str, func: Callable):
     """注册一个数据源的函数实现"""
+    if func is None:
+        return  # 跳过 None 函数（模块部分加载时的占位）
     _VENDOR_REGISTRY.setdefault(method, {})[vendor] = func
 
 
-def discover_and_register():
+def _discover_and_register_impl():
     """启动时自动发现并注册工具
 
     1. 从 tools_registry.yaml 读取工具定义
@@ -98,8 +111,10 @@ def discover_and_register():
                 logging.debug(f"Vendor {vendor} does not implement {tool_name}: {e}")
 
 
-# 启动时自动执行发现和注册
-discover_and_register()
+def discover_and_register():
+    """暴露给外部的初始化入口。调用后触发 discover 并返回 _VENDOR_REGISTRY"""
+    _ensure_registered()
+    return _VENDOR_REGISTRY
 
 
 def get_category_for_method(method: str) -> str:
@@ -108,6 +123,7 @@ def get_category_for_method(method: str) -> str:
     优先查 TOOLS_CATEGORIES（从 tools_registry.yaml 生成）。
     Fallback: 从函数元数据获取，或返回 'default'。
     """
+    _ensure_registered()
     # 优先查 TOOLS_CATEGORIES
     for category, info in TOOLS_CATEGORIES.items():
         if method in info["tools"]:
@@ -128,6 +144,7 @@ def get_vendor(category: str, method: str | None = None) -> str:
 
     优先级：tool_vendors > data_vendors > default > yfinance
     """
+    _ensure_registered()
     config = get_config()
 
     # 工具级别配置（最高优先级）
@@ -155,6 +172,7 @@ def route_to_vendor(method: str, *args, **kwargs):
     2. 按顺序尝试，失败时自动切换到下一个
     3. AlphaVantageRateLimitError 触发 fallback
     """
+    _ensure_registered()
     category = get_category_for_method(method)
     vendor_config = get_vendor(category, method)
     primary_vendors = [v.strip() for v in vendor_config.split(',')]

@@ -32,8 +32,8 @@ deep_thinking_llm = create_llm_client(config["deep_think_llm"], **config)
 quick_thinking_llm = create_llm_client(config["quick_think_llm"], **config)
 ```
 
-- `deep_thinking_llm`: 用于复杂推理（分析师、研究员、交易员）
-- `quick_thinking_llm`: 用于快速决策（辩论中的简单判断）
+- `deep_thinking_llm`: 用于复杂推理（Research Manager、Portfolio Manager）
+- `quick_thinking_llm`: 用于快速决策（分析师、交易员）
 
 ### 2. ToolNode 创建
 

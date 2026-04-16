@@ -16,6 +16,9 @@ from .interface import (
 
 from .decorators import auto_tool, TOOL_REGISTRY
 
+# 惰性初始化：首次访问时才触发 discover_and_register()
+# （由 _ensure_registered() 在 interface.py 中保证）
+
 __all__ = [
     "discover_and_register",
     "route_to_vendor",
