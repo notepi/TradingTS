@@ -36,9 +36,9 @@ tradingagents analyze
 
 | 文件 | 用途 |
 |------|------|
-| `config.yaml` | LLM 和数据源 |
-| `agents_registry.yaml` | 智能体工具绑定 |
-| `tools_registry.yaml` | 工具定义 |
+| `tradingagents/config.yaml` | LLM 和数据源配置 |
+| `tradingagents/config/agents_registry.yaml` | 智能体工具绑定 |
+| `datasource/datahub/servers/registry.yaml` | 工具定义 + vendor 路由 |
 
 ## 目录结构
 
@@ -49,23 +49,27 @@ TradingAgents/
 ├── tradingagents/          # 核心库
 │   ├── agents/            # 智能体实现
 │   │   ├── analysts/      # 市场/新闻/基本面/情绪分析师
-│   │   └── utils/        # 工具（indicator_docs_loader.py 动态加载指标）
+│   │   └── utils/         # 工具函数
 │   ├── dataflows/         # @auto_tool 装饰器
 │   └── config/            # 配置文件
-├── datasource/tushare/    # A股数据源
+├── datasource/
+│   ├── datahub/servers/   # 数仓层（@tool 定义 + vendor 路由）
+│   ├── tushare/           # A股数据源
+│   ├── yfinance/          # 美股数据源
+│   └── alpha_vantage/     # Alpha Vantage 数据源
 └── docs/                  # 详细文档
 ```
 
 ## 核心文件
 
-- `tradingagents/agents/analysts/market_analyst.py` - 市场分析师（含动态指标加载）
-- `tradingagents/agents/utils/indicator_docs_loader.py` - 从 tools_registry.yaml 动态读取指标文档
+- `datasource/datahub/servers/interface.py` - vendor 路由机制 + 自动注册
+- `datasource/datahub/servers/registry.yaml` - 工具定义 + vendor 配置
 - `web/dashboard.py` - Dashboard HTTP API（POST /api/start, GET /api/state）
 
 ## 详细文档
 
 - [docs/agent-architecture.md](docs/agent-architecture.md) - 智能体架构与辩论机制
+- [docs/datahub-design.md](docs/datahub-design.md) - 数仓层两层架构设计
 - [docs/dataflow-architecture.md](docs/dataflow-architecture.md) - 数据流架构
 - [docs/graph-execution.md](docs/graph-execution.md) - LangGraph 执行流程
 - [docs/agent-tools-configuration.md](docs/agent-tools-configuration.md) - 工具配置
-- [docs/indicator_analysis_final_report.md](docs/indicator_analysis_final_report.md) - 技术指标修复报告
