@@ -5,15 +5,15 @@ from pathlib import Path
 
 # 工具名到模块的映射（用于按需导入触发 @auto_tool 注册）
 TOOL_MODULES = {
-    "get_stock_data": "tradingagents.agents.utils.core_stock_tools",
-    "get_indicators": "tradingagents.agents.utils.technical_indicators_tools",
-    "get_fundamentals": "tradingagents.agents.utils.fundamental_data_tools",
-    "get_balance_sheet": "tradingagents.agents.utils.fundamental_data_tools",
-    "get_cashflow": "tradingagents.agents.utils.fundamental_data_tools",
-    "get_income_statement": "tradingagents.agents.utils.fundamental_data_tools",
-    "get_news": "tradingagents.agents.utils.news_data_tools",
-    "get_global_news": "tradingagents.agents.utils.news_data_tools",
-    "get_insider_transactions": "tradingagents.agents.utils.news_data_tools",
+    "get_stock_data": "datasource.tools.core_stock_tools",
+    "get_indicators": "datasource.tools.technical_indicators_tools",
+    "get_fundamentals": "datasource.tools.fundamental_data_tools",
+    "get_balance_sheet": "datasource.tools.fundamental_data_tools",
+    "get_cashflow": "datasource.tools.fundamental_data_tools",
+    "get_income_statement": "datasource.tools.fundamental_data_tools",
+    "get_news": "datasource.tools.news_data_tools",
+    "get_global_news": "datasource.tools.news_data_tools",
+    "get_insider_transactions": "datasource.tools.news_data_tools",
     # datasource 层工具（通过 @auto_tool 注册）
     "get_peg_ratio": "datasource.tushare.indicators.enhanced_data",
     "get_yoy_growth": "datasource.tushare.indicators.enhanced_data",
@@ -106,7 +106,7 @@ def get_language_instruction() -> str:
     Only applied to user-facing agents (analysts, portfolio manager).
     Internal debate agents stay in English for reasoning quality.
     """
-    from tradingagents.dataflows.config import get_config
+    from datasource.tools.config import get_config
     lang = get_config().get("output_language", "English")
     if lang.strip().lower() == "english":
         return ""

@@ -52,7 +52,7 @@ def dataflow_tool(category: str, description: str | None = None):
 
         # 自动注册（如果当前有 vendor 上下文）
         if _current_vendor_context:
-            from tradingagents.dataflows.interface import register_vendor
+            from datasource.tools.interface import register_vendor
             register_vendor(func.__name__, _current_vendor_context, func)
 
         return func

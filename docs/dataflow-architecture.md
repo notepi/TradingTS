@@ -1,6 +1,8 @@
 # 数据流架构文档
 
 > 本文档说明 TradingAgents 的数据流三层架构、配置方式、以及如何添加新指标或切换数据源。
+>
+> **相关文档**：[datasource-tools-architecture.md](datasource-tools-architecture.md) - datasource/tools 层的七层架构详解。
 
 ## 三层架构
 

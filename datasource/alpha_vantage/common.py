@@ -6,8 +6,8 @@ import json
 from datetime import datetime
 from io import StringIO
 
-# Import exception from tradingagents layer (used by interface.py for catching)
-from tradingagents.dataflows.alpha_vantage_common import AlphaVantageRateLimitError
+# Import exception from datasource.tools (used by interface.py for catching)
+from datasource.tools.interface import AlphaVantageRateLimitError
 
 API_BASE_URL = "https://www.alphavantage.co/query"
 

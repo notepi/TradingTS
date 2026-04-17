@@ -1,6 +1,6 @@
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from tradingagents.agents.utils.agent_utils import build_instrument_context, load_agent_tools, get_language_instruction
-from tradingagents.dataflows.config import get_config
+from datasource.tools.config import get_config
 
 
 def create_social_media_analyst(llm):

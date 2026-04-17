@@ -52,9 +52,9 @@ def _get_tushare_indicators() -> list[str]:
     current_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
 
-    registry_path = os.path.join(project_root, "tradingagents/config/tools_registry.yaml")
+    registry_path = os.path.join(project_root, "datasource/tools/tools_registry.yaml")
     if not os.path.exists(registry_path):
-        registry_path = os.path.join(project_root, "config/tools_registry.yaml")
+        registry_path = os.path.join(project_root, "tradingagents/config/tools_registry.yaml")
 
     try:
         with open(registry_path, encoding="utf-8") as f:

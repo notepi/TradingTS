@@ -1,9 +1,8 @@
 """Alpha Vantage 异常定义
 
-保留异常类供 interface.py 捕获。
-实际实现已迁移到 datasource/alpha_vantage/common.py
+异常类已迁移到 datasource/tools/interface.py。
+此文件保留向后兼容导入。
 """
 
-class AlphaVantageRateLimitError(Exception):
-    """Exception raised when Alpha Vantage API rate limit is exceeded."""
-    pass
+# 向后兼容导入
+from datasource.tools.interface import AlphaVantageRateLimitError

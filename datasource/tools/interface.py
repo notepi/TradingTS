@@ -9,8 +9,13 @@ import sys
 import yaml
 from typing import Callable
 
-from .alpha_vantage_common import AlphaVantageRateLimitError
 from .config import get_config
+
+
+# Alpha Vantage rate limit 异常
+class AlphaVantageRateLimitError(Exception):
+    """Exception raised when Alpha Vantage API rate limit is exceeded."""
+    pass
 
 
 # 动态生成的注册表（启动时填充）
@@ -34,12 +39,9 @@ def load_tools_registry() -> dict:
     config = get_config()
     project_dir = config.get("project_dir", "")
 
-    # tools_registry.yaml 相对于 project_dir
-    registry_path = os.path.join(project_dir, "config/tools_registry.yaml")
-
-    if not os.path.exists(registry_path):
-        # 尝试 tradingagents/config/ 路径
-        registry_path = os.path.join(project_dir, "tradingagents/config/tools_registry.yaml")
+    # project_dir 是 tradingagents/ 目录，需要往上找项目根目录
+    # tools_registry.yaml 在项目根目录的 datasource/tools/
+    registry_path = os.path.join(project_dir, "..", "datasource/tools/tools_registry.yaml")
 
     with open(registry_path, encoding="utf-8") as f:
         return yaml.safe_load(f)["tools"]

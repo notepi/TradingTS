@@ -5,7 +5,7 @@ from tradingagents.agents.utils.agent_utils import (
     get_language_instruction,
 )
 from tradingagents.agents.utils.indicator_docs_loader import get_indicator_docs
-from tradingagents.dataflows.config import get_config
+from datasource.tools.config import get_config
 
 
 def create_market_analyst(llm):
@@ -17,7 +17,7 @@ def create_market_analyst(llm):
         tools = load_agent_tools("market_analyst")
 
         # 动态加载指标文档
-        from tradingagents.dataflows.interface import get_vendor, get_category_for_method
+        from datasource.tools.interface import get_vendor, get_category_for_method
         category = get_category_for_method("get_indicators")
         vendor = get_vendor(category, "get_indicators")
         indicator_docs = get_indicator_docs(vendor)

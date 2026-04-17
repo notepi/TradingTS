@@ -4,7 +4,7 @@ from tradingagents.agents.utils.agent_utils import (
     load_agent_tools,
     get_language_instruction,
 )
-from tradingagents.dataflows.config import get_config
+from datasource.tools.config import get_config
 
 
 def create_news_analyst(llm):

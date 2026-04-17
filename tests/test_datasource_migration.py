@@ -24,7 +24,7 @@ def test_discover_and_register_finds_yfinance():
     """验证 discover_and_register 能发现 datasource/yfinance 下的工具"""
     from tradingagents.dataflows import discover_and_register
     discover_and_register()
-    from tradingagents.dataflows.interface import _VENDOR_REGISTRY
+    from datasource.tools.interface import _VENDOR_REGISTRY
 
     # 检查 yfinance 是否在 vendor registry 中
     yfinance_found = False
@@ -40,7 +40,7 @@ def test_discover_and_register_finds_alpha_vantage():
     """验证 discover_and_register 能发现 datasource/alpha_vantage 下的工具"""
     from tradingagents.dataflows import discover_and_register
     discover_and_register()
-    from tradingagents.dataflows.interface import _VENDOR_REGISTRY
+    from datasource.tools.interface import _VENDOR_REGISTRY
 
     # 检查 alpha_vantage 是否在 vendor registry 中
     alpha_vantage_found = False
@@ -54,7 +54,7 @@ def test_discover_and_register_finds_alpha_vantage():
 
 def test_vendor_paths_config():
     """验证 vendor_paths 配置正确"""
-    from tradingagents.dataflows.config import get_config
+    from datasource.tools.config import get_config
     config = get_config()
 
     vendor_paths = config.get('vendor_paths', {})

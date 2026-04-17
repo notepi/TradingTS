@@ -4,6 +4,8 @@
 
 本系统实现了智能体工具的全流程配置化管理。加工具只需改配置文件，无需改动任何核心代码。
 
+**相关文档**：[datasource-tools-architecture.md](datasource-tools-architecture.md) - datasource/tools 层的七层架构详解。
+
 ## 工具调用完整流程（7 步，全自动化）
 
 | 环节 | 文件 | 自动/手动 | 说明 |

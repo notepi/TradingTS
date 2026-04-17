@@ -13,7 +13,7 @@ def get_indicator_docs(vendor: str = "tushare") -> str:
     Returns:
         str: indicator_docs 字段内容，如果不存在返回空字符串
     """
-    config_path = Path(__file__).parent.parent.parent / "config" / "tools_registry.yaml"
+    config_path = Path(__file__).parent.parent.parent.parent / "datasource" / "tools" / "tools_registry.yaml"
     with open(config_path, encoding="utf-8") as f:
         config = yaml.safe_load(f)
 
