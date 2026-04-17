@@ -1,5 +1,5 @@
 from typing import Annotated
-from datasource.tools.interface import route_to_vendor
+from .interface import route_to_vendor
 from tradingagents.dataflows.decorators import auto_tool
 
 @auto_tool()
@@ -10,15 +10,30 @@ def get_indicators(
     look_back_days: Annotated[int, "how many days to look back, default 120"] = 120,
 ) -> str:
     """
-    Retrieve a single technical indicator for a given ticker symbol.
-    Uses the configured technical_indicators vendor.
+    Retrieve technical indicators for a given ticker symbol.
+
+    Supported indicators (tushare):
+    - Moving averages: close_10_ema, close_50_sma, close_200_sma
+    - MACD: macd, macds, macdh
+    - Momentum: rsi, mfi, cci, wr
+    - KDJ: kdjk, kdjd, kdjj
+    - Bollinger: boll, boll_ub, boll_lb
+    - Volatility: atr, vwma
+
+    Usage guide:
+    - Trend analysis: close_50_sma, close_200_sma, boll
+    - Momentum: rsi, macd, kdjk
+    - Overbought/oversold: rsi (>70 overbought, <30 oversold), wr, cci
+    - Volatility: atr, boll (band narrowing = volatility expanding soon)
+
     Args:
-        symbol (str): Ticker symbol of the company, e.g. AAPL, TSM
-        indicator (str): A single technical indicator name, e.g. 'rsi', 'macd'. Call this tool once per indicator.
-        curr_date (str): The current trading date you are trading on, YYYY-mm-dd
-        look_back_days (int): How many days to look back, default is 120
+        symbol: Ticker symbol of the company, e.g. AAPL, TSM
+        indicator: Single indicator name (e.g., 'rsi', 'macd'). Call once per indicator.
+        curr_date: The current trading date, YYYY-mm-dd
+        look_back_days: How many days to look back, default 120
+
     Returns:
-        str: A formatted dataframe containing the technical indicators for the specified ticker symbol and indicator.
+        Indicator values with field explanations
     """
     # LLMs sometimes pass multiple indicators as a comma-separated string;
     # split and process each individually.

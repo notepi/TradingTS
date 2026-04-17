@@ -1,6 +1,6 @@
 """数据流路由接口 - 自动发现机制
 
-从 tools_registry.yaml 加载工具定义，自动发现并注册各数据源的函数实现。
+从 registry.yaml 加载工具定义，自动发现并注册各数据源的函数实现。
 """
 
 import importlib
@@ -8,6 +8,7 @@ import os
 import sys
 import yaml
 from typing import Callable
+from pathlib import Path
 
 from .config import get_config
 
@@ -35,16 +36,25 @@ def _ensure_registered():
 
 
 def load_tools_registry() -> dict:
-    """从 tools_registry.yaml 加载工具定义"""
-    config = get_config()
-    project_dir = config.get("project_dir", "")
-
-    # project_dir 是 tradingagents/ 目录，需要往上找项目根目录
-    # tools_registry.yaml 在项目根目录的 datasource/tools/
-    registry_path = os.path.join(project_dir, "..", "datasource/tools/tools_registry.yaml")
+    """从 registry.yaml 加载工具定义"""
+    # registry.yaml 在当前目录
+    registry_path = Path(__file__).parent / "registry.yaml"
 
     with open(registry_path, encoding="utf-8") as f:
         return yaml.safe_load(f)["tools"]
+
+
+def get_all_tool_modules() -> dict:
+    """从 tools_registry.yaml 获取所有工具的 module_path 映射
+
+    用于动态导入工具模块，避免硬编码 TOOL_MODULES。
+    """
+    registry = load_tools_registry()
+    return {
+        name: spec.get("module_path")
+        for name, spec in registry.items()
+        if spec.get("module_path")
+    }
 
 
 def register_vendor(method: str, vendor: str, func: Callable):

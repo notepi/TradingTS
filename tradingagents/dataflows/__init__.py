@@ -1,11 +1,11 @@
 """
 tradingagents.dataflows - 数据流路由层
 
-路由核心已移至 datasource/tools/interface.py。
+路由核心已移至 datasource/datahub/servers/interface.py。
 这里保留装饰器和向后兼容的导入。
 """
 
-from datasource.tools.interface import (
+from datasource.datahub.servers.interface import (
     discover_and_register,
     route_to_vendor,
     get_vendor,

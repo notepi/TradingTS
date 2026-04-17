@@ -3,22 +3,6 @@ import yaml
 import importlib
 from pathlib import Path
 
-# 工具名到模块的映射（用于按需导入触发 @auto_tool 注册）
-TOOL_MODULES = {
-    "get_stock_data": "datasource.tools.core_stock_tools",
-    "get_indicators": "datasource.tools.technical_indicators_tools",
-    "get_fundamentals": "datasource.tools.fundamental_data_tools",
-    "get_balance_sheet": "datasource.tools.fundamental_data_tools",
-    "get_cashflow": "datasource.tools.fundamental_data_tools",
-    "get_income_statement": "datasource.tools.fundamental_data_tools",
-    "get_news": "datasource.tools.news_data_tools",
-    "get_global_news": "datasource.tools.news_data_tools",
-    "get_insider_transactions": "datasource.tools.news_data_tools",
-    # datasource 层工具（通过 @auto_tool 注册）
-    "get_peg_ratio": "datasource.tushare.indicators.enhanced_data",
-    "get_yoy_growth": "datasource.tushare.indicators.enhanced_data",
-}
-
 
 def load_agents_registry() -> dict:
     """加载 agents_registry.yaml 配置"""
@@ -41,6 +25,7 @@ def load_agent_tools(agent_name: str) -> list:
         list: LangChain tool 对象列表
     """
     from tradingagents.dataflows.decorators import TOOL_REGISTRY
+    from datasource.datahub.servers.interface import get_all_tool_modules
 
     registry = load_agents_registry()
     agent_config = registry.get("agents", {}).get(agent_name)
@@ -51,6 +36,9 @@ def load_agent_tools(agent_name: str) -> list:
     tools_config = agent_config.get("tools", [])
     tools = []
 
+    # 动态获取工具模块映射
+    tool_modules = get_all_tool_modules()
+
     for tool_item in tools_config:
         # 新格式：{name: "...", usage: "..."} 或旧格式：直接字符串
         if isinstance(tool_item, dict):
@@ -60,10 +48,10 @@ def load_agent_tools(agent_name: str) -> list:
 
         # 如果工具未注册，尝试导入对应模块触发 @auto_tool
         if name not in TOOL_REGISTRY:
-            if name in TOOL_MODULES:
-                importlib.import_module(TOOL_MODULES[name])
+            if name in tool_modules and tool_modules[name]:
+                importlib.import_module(tool_modules[name])
             else:
-                raise KeyError(f"Tool '{name}' not in TOOL_MODULES mapping")
+                raise KeyError(f"Tool '{name}' not in tools_registry.yaml or missing module_path")
 
         # 再次检查注册状态
         if name in TOOL_REGISTRY:
@@ -106,7 +94,7 @@ def get_language_instruction() -> str:
     Only applied to user-facing agents (analysts, portfolio manager).
     Internal debate agents stay in English for reasoning quality.
     """
-    from datasource.tools.config import get_config
+    from datasource.datahub.servers.config import get_config
     lang = get_config().get("output_language", "English")
     if lang.strip().lower() == "english":
         return ""

@@ -44,29 +44,8 @@ INDICATOR_DESCRIPTIONS = {
 
 
 def _get_tushare_indicators() -> list[str]:
-    """从 tools_registry.yaml 读取 tushare 支持的指标列表"""
-    import os
-    import yaml
-
-    # 向上查找 project root
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
-
-    registry_path = os.path.join(project_root, "datasource/tools/tools_registry.yaml")
-    if not os.path.exists(registry_path):
-        registry_path = os.path.join(project_root, "tradingagents/config/tools_registry.yaml")
-
-    try:
-        with open(registry_path, encoding="utf-8") as f:
-            tools = yaml.safe_load(f).get("tools", {})
-            get_indicators = tools.get("get_indicators", {})
-            vendors = get_indicators.get("vendors", {})
-            tushare = vendors.get("tushare", {})
-            indicators = tushare.get("indicators", [])
-            return indicators
-    except Exception:
-        # 如果读取失败，返回默认值
-        return list(INDICATOR_DESCRIPTIONS.keys())
+    """返回 tushare 支持的指标列表"""
+    return list(INDICATOR_DESCRIPTIONS.keys())
 
 try:
     from dotenv import load_dotenv

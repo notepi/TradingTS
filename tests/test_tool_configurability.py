@@ -125,9 +125,9 @@ def test_auto_tool_registration():
     """验证 @auto_tool 函数自动注册到 TOOL_REGISTRY"""
     from tradingagents.dataflows.decorators import TOOL_REGISTRY
 
-    # 导入模块触发注册
-    import tradingagents.agents.utils.core_stock_tools
-    import tradingagents.agents.utils.news_data_tools
+    # 导入模块触发注册（新路径）
+    import datasource.datahub.servers.market
+    import datasource.datahub.servers.news
 
     # 检查关键工具已注册
     assert "get_stock_data" in TOOL_REGISTRY, "get_stock_data should be registered via @auto_tool"

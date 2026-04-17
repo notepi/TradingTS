@@ -1,6 +1,6 @@
 from tradingagents.dataflows.decorators import auto_tool
 from typing import Annotated
-from datasource.tools.interface import route_to_vendor
+from .interface import route_to_vendor
 
 
 @auto_tool()
