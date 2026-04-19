@@ -220,3 +220,11 @@ __marimo__/
 
 # Results
 results/
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+
+# macOS
+.DS_Store

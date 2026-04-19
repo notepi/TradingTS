@@ -15,7 +15,7 @@ tools:
     description: |
       股票价格数据（OHLCV）- 获取股票的历史行情数据。
       返回开盘价、最高价、最低价、收盘价、成交量。
-    vendors: [tushare, yfinance, alpha_vantage]
+    vendors: [tushare, yfinance, tushare_sqlite_mirror, alpha_vantage]
 
   # technical_indicators - 技术指标
   get_indicators:
@@ -24,7 +24,7 @@ tools:
     description: |
       技术指标工具 - 获取股票的各类技术分析指标。
       用于分析股票趋势、动量、超买超卖、波动率等情况。
-    vendors: [tushare, yfinance, alpha_vantage]
+    vendors: [tushare, yfinance, tushare_sqlite_mirror, alpha_vantage]
 
   # fundamental_data - 基本面数据
   get_fundamentals:
@@ -33,28 +33,28 @@ tools:
     description: |
       基本面概览 - 获取公司的核心财务指标。
       包括市值、PE、PB、ROE、现金流等关键数据。
-    vendors: [tushare, yfinance, alpha_vantage]
+    vendors: [tushare, yfinance, tushare_sqlite_mirror, alpha_vantage]
   get_balance_sheet:
     category: fundamental_data
     module_path: datasource.datahub.servers.fundamental
     description: |
       资产负债表 - 获取公司的资产、负债、所有者权益数据。
       用于分析公司资产结构、负债水平、财务稳健性。
-    vendors: [tushare, yfinance, alpha_vantage]
+    vendors: [tushare, yfinance, tushare_sqlite_mirror, alpha_vantage]
   get_cashflow:
     category: fundamental_data
     module_path: datasource.datahub.servers.fundamental
     description: |
       现金流量表 - 获取公司经营、投资、筹资活动现金流。
       同时提供累计值和单季值，便于分析现金流趋势。
-    vendors: [tushare, yfinance, alpha_vantage]
+    vendors: [tushare, yfinance, tushare_sqlite_mirror, alpha_vantage]
   get_income_statement:
     category: fundamental_data
     module_path: datasource.datahub.servers.fundamental
     description: |
       利润表 - 获取公司的收入、成本、利润数据。
       用于分析公司盈利能力、毛利率、净利率变化。
-    vendors: [tushare, yfinance, alpha_vantage]
+    vendors: [tushare, yfinance, tushare_sqlite_mirror, alpha_vantage]
   get_peg_ratio:
     category: fundamental_data
     module_path: datasource.tushare.indicators.enhanced_data
@@ -62,14 +62,14 @@ tools:
       PEG估值指标 - PEG = PE(TTM) / 净利润增长率。
       用于判断成长股估值是否合理。
       PEG < 1 相对低估，PEG > 1 相对高估。
-    vendors: [tushare]
+    vendors: [tushare, tushare_sqlite_mirror]
   get_yoy_growth:
     category: fundamental_data
     module_path: datasource.tushare.indicators.enhanced_data
     description: |
       同比增长率数据 - 营收和净利润的同比增长率。
       同时提供累计值和单季值，含营收YOY和净利润YOY。
-    vendors: [tushare]
+    vendors: [tushare, tushare_sqlite_mirror]
 
   # news_data - 新闻数据
   get_news:

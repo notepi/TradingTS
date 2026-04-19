@@ -6,6 +6,13 @@ from web.translation.display_translation import DisplayTranslator
 
 
 TRANSLATABLE_RUN_FILES = (
+    "reports/market_report.md",
+    "reports/sentiment_report.md",
+    "reports/news_report.md",
+    "reports/fundamentals_report.md",
+    "reports/investment_plan.md",
+    "reports/trader_investment_plan.md",
+    "reports/final_trade_decision.md",
     "1_analysts/market.md",
     "1_analysts/sentiment.md",
     "1_analysts/news.md",

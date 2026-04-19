@@ -137,6 +137,9 @@ class DisplayTranslator:
             "Keep Markdown headings, lists, tables, stock tickers, numbers, dates, "
             "and code fences intact where appropriate. Preserve structure. "
             "Do not summarize. Do not add commentary. "
+            "IMPORTANT: This is a Chinese stock market report. "
+            "Currency symbols ¥ and abbreviations CNY refer to Chinese Yuan (人民币), NOT Japanese Yen (日元). "
+            "When translating to Chinese, use '元' or '人民币', never '日元'. "
             f"If the text is already in {self.output_language}, keep it unchanged.\n\n"
             f"{text}"
         )
@@ -157,7 +160,11 @@ class DisplayTranslator:
             retry_prompt = (
                 f"Translate all natural-language prose in the following Markdown document into "
                 f"{self.output_language}. Keep Markdown syntax, stock tickers, numbers, dates, "
-                "and code blocks unchanged. Output only the translated Markdown document.\n\n"
+                "and code blocks unchanged. "
+                "IMPORTANT: This is a Chinese stock market report. "
+                "Currency symbols ¥ and abbreviations CNY refer to Chinese Yuan (人民币), NOT Japanese Yen (日元). "
+                "When translating to Chinese, use '元' or '人民币', never '日元'. "
+                "Output only the translated Markdown document.\n\n"
                 f"{text}"
             )
             try:

@@ -1,8 +1,8 @@
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from tradingagents.agents.utils.agent_utils import (
     build_instrument_context,
+    get_output_language_instruction,
     load_agent_tools,
-    get_language_instruction,
 )
 from datasource.datahub.servers.config import get_config
 
@@ -16,11 +16,11 @@ def create_market_analyst(llm):
         tools = load_agent_tools("market_analyst")
 
         system_message = (
-            """You are a trading assistant tasked with analyzing financial markets. Your role is to select the **most relevant indicators** for a given market condition or trading strategy. The goal is to choose up to **12 indicators** that provide complementary insights without redundancy.
+            get_output_language_instruction()
+            + """You are a trading assistant tasked with analyzing financial markets. Your role is to select the **most relevant indicators** for a given market condition or trading strategy. The goal is to choose up to **12 indicators** that provide complementary insights without redundancy.
 
 Select indicators that provide diverse and complementary information. Also briefly explain why they are suitable for the given market context. When you tool call, please use the exact name of the indicators. Please make sure to call get_stock_data first to retrieve the CSV that is needed to generate indicators. Then use get_indicators with the specific indicator names. Write a very detailed and nuanced report of the trends you observe. Provide specific, actionable insights with supporting evidence to help traders make informed decisions."""
             + """ Make sure to append a Markdown table at the end of the report to organize key points in the report, organized and easy to read."""
-            + get_language_instruction()
         )
 
         prompt = ChatPromptTemplate.from_messages(

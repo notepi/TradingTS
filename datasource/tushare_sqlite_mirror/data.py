@@ -12,6 +12,7 @@ import os
 
 from .symbols import normalize_a_share_symbol
 from .api import get_api
+from .technical_indicators import calculate_indicator_frame
 
 # 指标名称映射：stockstats 使用的名称 -> 指标说明
 # 注意：stockstats 的指标名称是下划线格式（如 kdjk），不是下划线前的格式
@@ -176,9 +177,6 @@ def get_stock_stats_indicators_window(
         # 按日期升序排列
         df = df.sort_values("trade_date")
 
-        # 使用 stockstats 计算指标
-        from stockstats import wrap
-
         df = df.rename(columns={
             "trade_date": "Date",
             "open": "Open",
@@ -188,11 +186,13 @@ def get_stock_stats_indicators_window(
             "vol": "Volume"  # Tushare vol 单位是手(每手100股)
         })
         df["Date"] = pd.to_datetime(df["Date"])
+        try:
+            from stockstats import wrap
 
-        wrapped = wrap(df)
-
-        # 计算指标
-        _ = wrapped[indicator]
+            wrapped = wrap(df)
+            _ = wrapped[indicator]
+        except ImportError:
+            wrapped = calculate_indicator_frame(df, indicator)
 
         value_by_date = {}
         for _, row in wrapped.iterrows():
@@ -606,14 +606,65 @@ def get_income_statement(
 def get_insider_transactions(
     ticker: Annotated[str, "ticker symbol of the company"]
 ):
-    """Return stable placeholder text for unsupported insider data."""
+    """获取高管和股东增减持数据（从本地 SQLite 读取）。"""
     try:
         normalized_ticker = _convert_symbol(ticker)
     except ValueError as exc:
         return f"Error retrieving insider transactions for {ticker}: {str(exc)}"
-    return (
-        f"Insider transactions data is not available via Tushare citydata mode for "
-        f"'{normalized_ticker}'."
-    )
 
+    try:
+        pro = _get_pro()
+        df = pro.stk_rewards(ts_code=normalized_ticker)
 
+        if df.empty:
+            return f"No insider transactions data found for '{normalized_ticker}'"
+
+        df = df.sort_values("ann_date", ascending=False)
+
+        # 字段说明
+        field_names = {
+            "ts_code": "股票代码",
+            "ann_date": "公告日期",
+            "end_date": "报告期",
+            "name": "姓名",
+            "title": "职务",
+            "type": "类型",
+            "reward": "薪酬",
+            "holding_shares": "持股数量",
+            "in_deal": "买入数量",
+            "out_deal": "卖出数量",
+            "change_reason": "变动原因",
+        }
+
+        # 只保留已知字段
+        available_fields = [f for f in field_names.keys() if f in df.columns]
+        df = df[available_fields]
+
+        # 重命名为中文
+        df = df.rename(columns=field_names)
+
+        # 转换日期格式
+        if "公告日期" in df.columns:
+            df["公告日期"] = df["公告日期"].astype(str)
+        if "报告期" in df.columns:
+            df["报告期"] = df["报告期"].astype(str)
+
+        # 取最近 30 条
+        df = df.head(30)
+
+        csv_string = df.to_csv(index=False)
+
+        header = f"# 高管与股东增减持数据 - {normalized_ticker}\n"
+        header += f"# 共 {len(df)} 条记录\n"
+        header += f"# Data retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+        header += f"# Data source: Tushare (citydata.club proxy)\n\n"
+
+        return header + csv_string
+
+    except FileNotFoundError as exc:
+        return (
+            f"SQLite mirror not found for '{normalized_ticker}'. "
+            f"Has the sync been run? Error: {str(exc)}"
+        )
+    except Exception as e:
+        return f"Error retrieving insider transactions for {ticker}: {str(e)}"

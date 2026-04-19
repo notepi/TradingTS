@@ -8,7 +8,8 @@
 
 ```bash
 # 一条命令：启动 Dashboard → 分析 → 关闭端口
-tradingagents test 688333.SH --date 2026-04-14
+uv run tradingagents test 688333.SH --date 2026-04-14
+2026-04-14是日期，要自己修改
 ```
 
 ### Dashboard 网页
@@ -68,8 +69,14 @@ TradingAgents/
 
 ## 详细文档
 
-- [docs/agent-architecture.md](docs/agent-architecture.md) - 智能体架构与辩论机制
-- [docs/datahub-design.md](docs/datahub-design.md) - 数仓层两层架构设计
-- [docs/dataflow-architecture.md](docs/dataflow-architecture.md) - 数据流架构
+**文档入口**：[docs/README.md](docs/README.md)
+
+**用户文档**：
+- [docs/getting-started.md](docs/getting-started.md) - 快速上手
+- [docs/cli-guide.md](docs/cli-guide.md) - CLI 使用
+- [docs/dashboard-guide.md](docs/dashboard-guide.md) - Dashboard 使用
+
+**开发者文档**：
+- [docs/datahub-design.md](docs/datahub-design.md) - 数仓层架构设计
+- [docs/agent-architecture.md](docs/agent-architecture.md) - 智能体架构
 - [docs/graph-execution.md](docs/graph-execution.md) - LangGraph 执行流程
-- [docs/agent-tools-configuration.md](docs/agent-tools-configuration.md) - 工具配置

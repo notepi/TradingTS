@@ -101,6 +101,21 @@ def get_language_instruction() -> str:
     return f" Write your entire response in {lang}."
 
 
+def get_output_language_instruction() -> str:
+    """Return instruction for analysts to write reports in English.
+
+    Ensures consistent English output regardless of input data language.
+    """
+    return (
+        "You are a financial analyst. "
+        "Input data may contain Chinese or other languages. "
+        "Understand the input correctly and write your entire report in English.\n"
+        "IMPORTANT: Pay close attention to unit annotations in data headers. "
+        "Chinese units (亿元/万元/手) are NOT the same as English units (Billion/Million/Lot). "
+        "Convert values correctly when writing English reports."
+    )
+
+
 def build_instrument_context(ticker: str) -> str:
     """Describe the exact instrument so agents preserve exchange-qualified tickers."""
     return (

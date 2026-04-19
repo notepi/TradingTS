@@ -26,4 +26,5 @@ vendor_paths:
   tushare: "datasource.tushare"
   yfinance: "datasource.yfinance"
   alpha_vantage: "datasource.alpha_vantage"
+  tushare_sqlite_mirror: "datasource.tushare_sqlite_mirror"
   # my_metrics: "/path/to/my_metrics"
