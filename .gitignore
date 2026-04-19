@@ -228,3 +228,7 @@ results/
 
 # macOS
 .DS_Store
+
+# Next.js
+web2/node_modules/
+web2/.next/
