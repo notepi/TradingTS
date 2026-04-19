@@ -17,6 +17,7 @@
 | [datahub-design.md](datahub-design.md) | 数仓层两层架构设计 | 理解架构 |
 | [agent-architecture.md](agent-architecture.md) | 智能体协作流程与辩论机制 | 智能体开发 |
 | [graph-execution.md](graph-execution.md) | LangGraph 执行流程 | 图执行调试 |
+| [add-new-agent.md](add-new-agent.md) | 添加新智能体指南与 Checklist | 智能体扩展 |
 
 ## 快速导航
 
@@ -26,3 +27,4 @@
 - **配置问题** → [configuration-guide.md](configuration-guide.md)
 - **开发扩展** → [datahub-design.md](datahub-design.md)
 - **添加工具** → [data-source-guide.md](data-source-guide.md)
+- **添加智能体** → [add-new-agent.md](add-new-agent.md)
