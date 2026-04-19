@@ -93,6 +93,7 @@ RUNTIME_AGENT_FILE_MAP = {
     "Fundamentals Analyst": Path("1_analysts/fundamentals.md"),
     "Bull Researcher": Path("2_research/bull.md"),
     "Bear Researcher": Path("2_research/bear.md"),
+    "Peter Lynch Researcher": Path("2_research/peter_lynch.md"),
     "Research Manager": Path("2_research/manager.md"),
     "Trader": Path("3_trading/trader.md"),
     "Aggressive Analyst": Path("4_risk/aggressive.md"),
@@ -103,6 +104,7 @@ RUNTIME_AGENT_FILE_MAP = {
 RUNTIME_AGENT_EVENT_HEADINGS = {
     "Bull Researcher": "### Bull Researcher Analysis",
     "Bear Researcher": "### Bear Researcher Analysis",
+    "Peter Lynch Researcher": "### Peter Lynch Researcher Analysis",
     "Research Manager": "### Research Manager Decision",
     "Aggressive Analyst": "### Aggressive Analyst Analysis",
     "Conservative Analyst": "### Conservative Analyst Analysis",
@@ -117,6 +119,7 @@ RUNTIME_SECTION_MEMBERS = {
     "investment_plan": [
         ("Bull Researcher", "### Bull Researcher Analysis"),
         ("Bear Researcher", "### Bear Researcher Analysis"),
+        ("Peter Lynch Researcher", "### Peter Lynch Researcher Analysis"),
         ("Research Manager", "### Research Manager Decision"),
     ],
     "trader_investment_plan": [("Trader", None)],
@@ -744,10 +747,13 @@ class DashboardSession:
         if judge:
             bull_hist = str(debate_state.get("bull_history") or "").strip()
             bear_hist = str(debate_state.get("bear_history") or "").strip()
+            peter_lynch_hist = str(debate_state.get("peter_lynch_history") or "").strip()
             if bull_hist:
                 member_outputs.append(("Bull Researcher", bull_hist))
             if bear_hist:
                 member_outputs.append(("Bear Researcher", bear_hist))
+            if peter_lynch_hist:
+                member_outputs.append(("Peter Lynch Researcher", peter_lynch_hist))
             member_outputs.append(("Research Manager", judge))
 
         risk_state = chunk.get("risk_debate_state") or {}

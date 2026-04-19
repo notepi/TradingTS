@@ -19,6 +19,7 @@ TRANSLATABLE_RUN_FILES = (
     "1_analysts/fundamentals.md",
     "2_research/bull.md",
     "2_research/bear.md",
+    "2_research/peter_lynch.md",
     "2_research/manager.md",
     "3_trading/trader.md",
     "4_risk/aggressive.md",

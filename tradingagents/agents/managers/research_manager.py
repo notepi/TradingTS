@@ -46,6 +46,7 @@ Debate History:
             "history": investment_debate_state.get("history", ""),
             "bear_history": investment_debate_state.get("bear_history", ""),
             "bull_history": investment_debate_state.get("bull_history", ""),
+            "peter_lynch_history": investment_debate_state.get("peter_lynch_history", ""),
             "current_response": response.content,
             "count": investment_debate_state["count"],
         }

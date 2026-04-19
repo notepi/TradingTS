@@ -94,6 +94,7 @@ class TradingAgentsGraph:
         # Initialize memories
         self.bull_memory = FinancialSituationMemory("bull_memory", self.config)
         self.bear_memory = FinancialSituationMemory("bear_memory", self.config)
+        self.peter_lynch_memory = FinancialSituationMemory("peter_lynch_memory", self.config)
         self.trader_memory = FinancialSituationMemory("trader_memory", self.config)
         self.invest_judge_memory = FinancialSituationMemory("invest_judge_memory", self.config)
         self.portfolio_manager_memory = FinancialSituationMemory("portfolio_manager_memory", self.config)
@@ -112,6 +113,7 @@ class TradingAgentsGraph:
             self.tool_nodes,
             self.bull_memory,
             self.bear_memory,
+            self.peter_lynch_memory,
             self.trader_memory,
             self.invest_judge_memory,
             self.portfolio_manager_memory,
@@ -208,6 +210,7 @@ class TradingAgentsGraph:
             "investment_debate_state": {
                 "bull_history": final_state["investment_debate_state"]["bull_history"],
                 "bear_history": final_state["investment_debate_state"]["bear_history"],
+                "peter_lynch_history": final_state["investment_debate_state"]["peter_lynch_history"],
                 "history": final_state["investment_debate_state"]["history"],
                 "current_response": final_state["investment_debate_state"][
                     "current_response"
@@ -243,6 +246,9 @@ class TradingAgentsGraph:
         )
         self.reflector.reflect_bear_researcher(
             self.curr_state, returns_losses, self.bear_memory
+        )
+        self.reflector.reflect_peter_lynch_researcher(
+            self.curr_state, returns_losses, self.peter_lynch_memory
         )
         self.reflector.reflect_trader(
             self.curr_state, returns_losses, self.trader_memory
