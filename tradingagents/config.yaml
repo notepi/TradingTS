@@ -12,9 +12,9 @@ output:
 
 # 数据源配置
 data_vendors:
-  core_stock_apis: "tushare"
-  technical_indicators: "tushare"
-  fundamental_data: "tushare"
+  core_stock_apis: "tushare_sqlite_mirror"
+  technical_indicators: "tushare_sqlite_mirror"
+  fundamental_data: "tushare_sqlite_mirror"
   news_data: "yfinance"
 
 # 工具级别数据源配置（可选，优先级高于 data_vendors）

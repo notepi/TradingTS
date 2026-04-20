@@ -82,7 +82,7 @@ class TushareProxyAPI:
 
         url = f"{self._base_url}/{api_name}"
         try:
-            resp = requests.post(url, data=params, timeout=30)
+            resp = requests.post(url, data=params, timeout=60)
             resp.raise_for_status()
         except requests.exceptions.HTTPError as e:
             if resp.status_code == 404:

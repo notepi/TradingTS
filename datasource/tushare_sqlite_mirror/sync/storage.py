@@ -1,3 +1,9 @@
+"""
+sync/storage.py - SQLite 存储层
+
+新表结构：直接存格式化数据，每个函数对应一个表
+"""
+
 from __future__ import annotations
 
 import sqlite3
@@ -5,60 +11,42 @@ from pathlib import Path
 
 import pandas as pd
 
+# 表结构定义：函数名 -> 表名
+FUNCTION_TABLE_MAP = {
+    "get_stock_data": "stock_data",
+    "get_indicators": "indicators",
+    "get_fundamentals": "fundamentals",
+    "get_balance_sheet": "balance_sheet",
+    "get_cashflow": "cashflow",
+    "get_income_statement": "income_statement",
+    "get_peg_ratio": "peg_ratio",
+    "get_yoy_growth": "yoy_growth",
+    "get_insider_transactions": "insider_transactions",
+}
+
+# 每个表的唯一键（用于 upsert）
+TABLE_UNIQUE_KEYS = {
+    "stock_data": ["ts_code", "Date"],
+    "indicators": ["ts_code", "indicator", "Date"],
+    "fundamentals": ["ts_code", "Date"],  # 每日估值历史
+    "balance_sheet": ["ts_code", "end_date", "end_type"],
+    "cashflow": ["ts_code", "end_date", "end_type"],
+    "income_statement": ["ts_code", "end_date", "end_type"],
+    "peg_ratio": ["ts_code", "end_date", "end_type"],
+    "yoy_growth": ["ts_code", "end_date", "end_type"],
+    "insider_transactions": ["ts_code", "ann_date", "name"],
+}
+
+# 元数据列（自动添加到所有表）
 SYNC_METADATA_COLUMNS = {
     "synced_at": "TEXT",
     "source": "TEXT",
     "batch_id": "TEXT",
 }
 
-TABLE_UNIQUE_KEYS = {
-    "stock_basic_raw": ["ts_code"],
-    "daily_raw": ["ts_code", "trade_date"],
-    "daily_basic_raw": ["ts_code", "trade_date"],
-    "income_raw": ["ts_code", "end_date", "end_type", "ann_date", "update_flag"],
-    "balancesheet_raw": ["ts_code", "end_date", "end_type", "ann_date", "update_flag"],
-    "cashflow_raw": ["ts_code", "end_date", "end_type", "ann_date", "update_flag"],
-    "fina_indicator_raw": ["ts_code", "end_date", "end_type", "ann_date", "update_flag"],
-    "dividend_raw": ["ts_code", "end_date", "ann_date", "div_proc"],
-    "stk_rewards_raw": ["ts_code", "ann_date", "name"],
-    "market_daily_features": ["ts_code", "trade_date"],
-    "financial_period_features": ["ts_code", "end_date", "end_type"],
-    "dividend_features": ["ts_code", "end_date"],
-    "result_fundamentals_latest": ["ts_code"],
-    "result_yoy_growth": ["ts_code", "report_period", "end_type"],
-    "result_peg_ratio": ["ts_code", "end_date", "end_type"],
-    "result_technical_indicators_daily": ["ts_code", "trade_date"],
-}
-
-TABLE_INDEXES = {
-    "daily_raw": [["ts_code", "trade_date"]],
-    "daily_basic_raw": [["ts_code", "trade_date"]],
-    "income_raw": [["ts_code", "end_date", "end_type"], ["ts_code", "ann_date"]],
-    "balancesheet_raw": [["ts_code", "end_date", "end_type"], ["ts_code", "ann_date"]],
-    "cashflow_raw": [["ts_code", "end_date", "end_type"], ["ts_code", "ann_date"]],
-    "fina_indicator_raw": [["ts_code", "end_date", "end_type"], ["ts_code", "ann_date"]],
-    "dividend_raw": [["ts_code", "ann_date"]],
-    "stock_basic_raw": [["ts_code"]],
-    "stk_rewards_raw": [["ts_code", "ann_date"]],
-    "market_daily_features": [["ts_code", "trade_date"]],
-    "financial_period_features": [["ts_code", "end_date", "end_type"]],
-    "dividend_features": [["ts_code", "ann_date"]],
-    "result_fundamentals_latest": [["ts_code"]],
-    "result_yoy_growth": [["ts_code", "report_period"]],
-    "result_peg_ratio": [["ts_code", "end_date"]],
-    "result_technical_indicators_daily": [["ts_code", "trade_date"]],
-}
-
-
-def _sqlite_type_for_series(series: pd.Series) -> str:
-    if pd.api.types.is_integer_dtype(series):
-        return "INTEGER"
-    if pd.api.types.is_float_dtype(series):
-        return "REAL"
-    return "TEXT"
-
 
 def connect(db_path: Path | str) -> sqlite3.Connection:
+    """连接数据库"""
     path = Path(db_path)
     path.parent.mkdir(parents=True, exist_ok=True)
     connection = sqlite3.connect(path)
@@ -68,6 +56,7 @@ def connect(db_path: Path | str) -> sqlite3.Connection:
 
 
 def initialize_database(db_path: Path | str) -> None:
+    """初始化数据库（创建 sync_batches 表）"""
     connection = connect(db_path)
     try:
         connection.execute(
@@ -88,7 +77,17 @@ def initialize_database(db_path: Path | str) -> None:
         connection.close()
 
 
+def _sqlite_type_for_series(series: pd.Series) -> str:
+    """推断 SQLite 类型"""
+    if pd.api.types.is_integer_dtype(series):
+        return "INTEGER"
+    if pd.api.types.is_float_dtype(series):
+        return "REAL"
+    return "TEXT"
+
+
 def ensure_table(connection: sqlite3.Connection, table_name: str, frame: pd.DataFrame) -> None:
+    """确保表存在，动态创建列"""
     columns = {column: _sqlite_type_for_series(frame[column]) for column in frame.columns}
     columns.update(SYNC_METADATA_COLUMNS)
 
@@ -105,6 +104,7 @@ def ensure_table(connection: sqlite3.Connection, table_name: str, frame: pd.Data
             if name not in existing:
                 connection.execute(f'ALTER TABLE "{table_name}" ADD COLUMN "{name}" {type_name}')
 
+    # 创建唯一索引
     unique_keys = TABLE_UNIQUE_KEYS.get(table_name, [])
     if unique_keys:
         connection.execute(
@@ -112,11 +112,16 @@ def ensure_table(connection: sqlite3.Connection, table_name: str, frame: pd.Data
             f'ON "{table_name}" ({", ".join(unique_keys)})'
         )
 
-    for index_columns in TABLE_INDEXES.get(table_name, []):
-        index_name = f'ix_{table_name}_{"_".join(index_columns)}'
+    # 创建查询索引
+    if table_name in {"stock_data", "indicators"}:
         connection.execute(
-            f'CREATE INDEX IF NOT EXISTS "{index_name}" '
-            f'ON "{table_name}" ({", ".join(index_columns)})'
+            f'CREATE INDEX IF NOT EXISTS "ix_{table_name}_date" '
+            f'ON "{table_name}" ("ts_code", "Date")'
+        )
+    elif table_name in {"balance_sheet", "cashflow", "income_statement", "peg_ratio", "yoy_growth"}:
+        connection.execute(
+            f'CREATE INDEX IF NOT EXISTS "ix_{table_name}_end_date" '
+            f'ON "{table_name}" ("ts_code", "end_date")'
         )
 
 
@@ -126,8 +131,9 @@ def upsert_dataframe(
     frame: pd.DataFrame,
     *,
     batch_id: str,
-    source: str = "citydata",
+    source: str = "tushare",
 ) -> int:
+    """Upsert DataFrame 到表"""
     if frame.empty:
         return 0
 
@@ -146,7 +152,11 @@ def upsert_dataframe(
         f"VALUES ({placeholders})"
     )
     records = [
-        tuple(None if pd.isna(value) else value for value in row)
+        tuple(
+            None if (not isinstance(value, (list, tuple)) and pd.isna(value))
+            else (str(value) if isinstance(value, (list, tuple, dict)) else value)
+            for value in row
+        )
         for row in working.itertuples(index=False, name=None)
     ]
     connection.executemany(sql, records)
@@ -162,6 +172,7 @@ def log_batch(
     row_count: int,
     message: str = "",
 ) -> None:
+    """记录同步批次"""
     connection.execute(
         """
         INSERT INTO sync_batches (batch_id, table_name, status, row_count, message)

@@ -1,6 +1,7 @@
 import functools
 
 from tradingagents.agents.utils.agent_utils import build_instrument_context
+from ..utils.prompt_instructions import DATA_ACCURACY_INSTRUCTION
 
 
 def create_trader(llm, memory):
@@ -31,7 +32,9 @@ def create_trader(llm, memory):
         messages = [
             {
                 "role": "system",
-                "content": f"""You are a trading agent analyzing market data to make investment decisions. IMPORTANT: You have NO access to tools. Base your decision solely on the analyst reports and investment plan provided in the context. Do NOT attempt to gather additional data or call any functions. Based on your analysis, provide a specific recommendation to buy, sell, or hold. End with a firm decision and always conclude your response with 'FINAL TRANSACTION PROPOSAL: **BUY/HOLD/SELL**' to confirm your recommendation. Apply lessons from past decisions to strengthen your analysis. Here are reflections from similar situations you traded in and the lessons learned: {past_memory_str}""",
+                "content": f"""You are a trading agent analyzing market data to make investment decisions. IMPORTANT: You have NO access to tools. Base your decision solely on the analyst reports and investment plan provided in the context. Do NOT attempt to gather additional data or call any functions. Based on your analysis, provide a specific recommendation to buy, sell, or hold. End with a firm decision and always conclude your response with 'FINAL TRANSACTION PROPOSAL: **BUY/HOLD/SELL**' to confirm your recommendation. Apply lessons from past decisions to strengthen your analysis. Here are reflections from similar situations you traded in and the lessons learned: {past_memory_str}
+
+{DATA_ACCURACY_INSTRUCTION}""",
             },
             context,
         ]

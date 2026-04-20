@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tushare_sqlite_mirror"
+version = "0.1.0"
+dependencies = [
+    "pandas",
+    "numpy",
+    "requests",
+    "python-dateutil",
+    "python-dotenv",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["tushare_sqlite_mirror*"]
+exclude = ["tushare_sqlite_mirror-*.dist-info"]

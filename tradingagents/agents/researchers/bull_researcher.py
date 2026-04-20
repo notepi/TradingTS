@@ -1,8 +1,6 @@
 
 
-DATA_ACCURACY_INSTRUCTION = """
-DATA ACCURACY: Quote EXACT numbers from the reports. Cite sources: "fundamentals_report: inventory = 14.50 billion"
-"""
+from ..utils.prompt_instructions import DATA_ACCURACY_INSTRUCTION
 
 
 def create_bull_researcher(llm, memory):

@@ -27,7 +27,11 @@ tushare 双模式 API 入口
 """
 
 import os
+from dotenv import load_dotenv
 from typing import Literal, Optional
+
+# 确保 .env 在任何环境变量读取前加载
+load_dotenv()
 
 Mode = Literal["proxy", "sdk"]
 

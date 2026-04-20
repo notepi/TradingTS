@@ -1,5 +1,8 @@
 
 
+from ..utils.prompt_instructions import DATA_ACCURACY_INSTRUCTION
+
+
 def create_aggressive_debator(llm):
     def aggressive_node(state) -> dict:
         risk_debate_state = state["risk_debate_state"]
@@ -21,6 +24,8 @@ def create_aggressive_debator(llm):
 {trader_decision}
 
 Your task is to create a compelling case for the trader's decision by questioning and critiquing the conservative and neutral stances to demonstrate why your high-reward perspective offers the best path forward. Incorporate insights from the following sources into your arguments:
+
+{DATA_ACCURACY_INSTRUCTION}
 
 Market Research Report: {market_research_report}
 Social Media Sentiment Report: {sentiment_report}

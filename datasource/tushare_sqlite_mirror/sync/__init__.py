@@ -1,5 +1,9 @@
-"""Standalone citydata -> SQLite sync package for the Tushare mirror."""
+"""
+sync - 数据同步入库模块
 
-from .pipeline import run_bootstrap, run_daily_sync, run_pipeline
+调用 datasource.tushare 函数获取数据，存入 SQLite 缓存。
+"""
 
-__all__ = ["run_bootstrap", "run_daily_sync", "run_pipeline"]
+from .pipeline import run_pipeline, run_bootstrap, run_daily_sync
+
+__all__ = ["run_pipeline", "run_bootstrap", "run_daily_sync"]

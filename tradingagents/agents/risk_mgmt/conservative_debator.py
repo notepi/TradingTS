@@ -1,5 +1,8 @@
 
 
+from ..utils.prompt_instructions import DATA_ACCURACY_INSTRUCTION
+
+
 def create_conservative_debator(llm):
     def conservative_node(state) -> dict:
         risk_debate_state = state["risk_debate_state"]
@@ -21,6 +24,8 @@ def create_conservative_debator(llm):
 {trader_decision}
 
 Your task is to actively counter the arguments of the Aggressive and Neutral Analysts, highlighting where their views may overlook potential threats or fail to prioritize sustainability. Respond directly to their points, drawing from the following data sources to build a convincing case for a low-risk approach adjustment to the trader's decision:
+
+{DATA_ACCURACY_INSTRUCTION}
 
 Market Research Report: {market_research_report}
 Social Media Sentiment Report: {sentiment_report}

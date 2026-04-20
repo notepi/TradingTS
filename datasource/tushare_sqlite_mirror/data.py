@@ -1,670 +1,163 @@
 """
-Tushare 数据接口 - 双模式 API（HTTP 代理 / 官方 SDK）
+datasource.tushare_sqlite_mirror.data - SQLite 缓存数据接口
 
-与 y_finance.py 保持相同接口，实现平滑切换。
+从 SQLite 缓存取数，输出格式和 datasource.tushare 一致。
 """
 
 from typing import Annotated
-from datetime import datetime
-from dateutil.relativedelta import relativedelta
-import pandas as pd
-import os
 
-from .symbols import normalize_a_share_symbol
-from .api import get_api
-from .technical_indicators import calculate_indicator_frame
+# 从 tushare 导入常量
+from datasource.tushare.data import INDICATOR_DESCRIPTIONS
 
-# 指标名称映射：stockstats 使用的名称 -> 指标说明
-# 注意：stockstats 的指标名称是下划线格式（如 kdjk），不是下划线前的格式
-INDICATOR_DESCRIPTIONS = {
-    # 移动平均
-    "close_10_ema": "10 EMA: A short-term exponential moving average.",
-    "close_50_sma": "50 SMA: A medium-term simple moving average.",
-    "close_200_sma": "200 SMA: A long-term simple moving average.",
-    # MACD 系列（配套使用）
-    "macd": "MACD: Moving Average Convergence Divergence (12, 26, 9).",
-    "macds": "MACD Signal: EMA of MACD line (9-period).",
-    "macdh": "MACD Histogram: Difference between MACD and Signal line.",
-    # 动量
-    "rsi": "RSI: Relative Strength Index (14-period) - overbought/oversold.",
-    "mfi": "MFI: Money Flow Index (14-period) - volume-weighted RSI.",
-    "cci": "CCI: Commodity Channel Index (14-period) - trend strength.",
-    "wr": "WR: Williams %R (14-period) - overbought/oversold.",
-    # KDJ 随机指标（配套使用）
-    "kdjk": "KDJ K: Stochastic Fast K line (9-period).",
-    "kdjd": "KDJ D: Stochastic Slow D line (3-period SMA of K).",
-    "kdjj": "KDJ J: Stochastic J line - volatility adjusted K.",
-    # 布林带（配套使用）
-    "boll": "Bollinger Middle: 20 SMA as basis for Bollinger Bands.",
-    "boll_ub": "Bollinger Upper: Upper band (Middle + 2 std).",
-    "boll_lb": "Bollinger Lower: Lower band (Middle - 2 std).",
-    # 波动率
-    "atr": "ATR: Average True Range (14-period) - market volatility.",
-    "vwma": "VWMA: Volume Weighted Moving Average.",
-}
+# 导入 provider 和 get_provider
+from .provider import SQLiteMirrorProvider, get_provider
 
 
-def _get_tushare_indicators() -> list[str]:
-    """返回 tushare 支持的指标列表"""
-    return list(INDICATOR_DESCRIPTIONS.keys())
+# ========== 暴露函数（兼容现有调用）==========
 
-try:
-    from dotenv import load_dotenv
-except ImportError:
-    def load_dotenv():
-        pass
-
-load_dotenv()
-
-
-def _get_pro():
-    """获取 Tushare API 客户端（自动选择模式）"""
-    return get_api()  # 从环境变量读取模式和 token
-
-
-def _convert_symbol(symbol: str) -> str:
-    """Normalize A-share ticker format for Tushare."""
-    return normalize_a_share_symbol(symbol)
-
-
-def get_Tushare_data_online(
+def get_stock_data(
     symbol: Annotated[str, "ticker symbol of the company"],
     start_date: Annotated[str, "Start date in yyyy-mm-dd format"],
     end_date: Annotated[str, "End date in yyyy-mm-dd format"],
-):
-    """获取股票历史数据 (OHLCV)"""
-    datetime.strptime(start_date, "%Y-%m-%d")
-    datetime.strptime(end_date, "%Y-%m-%d")
-
-    normalized_symbol = _convert_symbol(symbol)
-    ts_code = normalized_symbol
-
-    # 转换日期格式: 2025-04-02 -> 20250402
-    start_dt = start_date.replace("-", "")
-    end_dt = end_date.replace("-", "")
-
-    try:
-        pro = _get_pro()
-        df = pro.daily(ts_code=ts_code, start_date=start_dt, end_date=end_dt)
-
-        if df.empty:
-            return f"No data found for symbol '{symbol}' between {start_date} and {end_date}"
-
-        # 按日期升序排列
-        df = df.sort_values("trade_date")
-
-        # 重命名列以匹配 yfinance 格式
-        # 注意：Tushare vol 单位是"手"(每手100股)，不是股数
-        df = df.rename(columns={
-            "trade_date": "Date",
-            "open": "Open",
-            "high": "High",
-            "low": "Low",
-            "close": "Close",
-            "vol": "Volume",
-            "amount": "Amount"
-        })
-
-        # 选择需要的列
-        df = df[["Date", "Open", "High", "Low", "Close", "Volume"]]
-
-        # 格式化日期
-        df["Date"] = pd.to_datetime(df["Date"]).dt.strftime("%Y-%m-%d")
-
-        # 转换为 CSV
-        csv_string = df.to_csv(index=False)
-
-        header = "[Tool: get_stock_data] - 原始价格数据\n"
-        header += f"# Stock data for {normalized_symbol} from {start_date} to {end_date}\n"
-        header += f"# Total records: {len(df)}\n"
-        header += f"# Data retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-        header += f"# Data source: Tushare (citydata.club proxy)\n"
-        header += f"# Unit: Volume in Lots (1 Lot = 100 shares), Amount in Thousand CNY\n"
-        header += f"# Conversion: Lots × 100 = Total shares\n\n"
-
-        return header + csv_string
-
-    except Exception as e:
-        return f"Error retrieving data for {symbol}: {str(e)}"
-
-
-def get_stock_stats_indicators_window(
-    symbol: Annotated[str, "ticker symbol of the company"],
-    indicator: Annotated[str, "technical indicator to get the analysis and report of"],
-    curr_date: Annotated[str, "The current trading date you are trading on, YYYY-mm-dd"],
-    look_back_days: Annotated[int, "how many days of values to display in the output"] = 30,
+    raw: bool = False,
 ) -> str:
-    """获取技术指标数据
+    """获取股票历史数据 (OHLCV) - 从 SQLite 缓存
 
-    注意：此函数固定获取1年历史数据以确保指标计算准确，
-    look_back_days 只控制输出显示的日期范围，不影响计算精度。
-
-    支持的指标列表从 tools_registry.yaml 读取，添加新指标只需修改配置文件。
+    Args:
+        raw: False=格式化字符串（LLM用），True=DataFrame（入库用）
     """
+    return get_provider().get_stock_data(symbol, start_date, end_date, raw=raw)
 
-    # 从配置读取支持的指标列表
-    supported_indicators = _get_tushare_indicators()
 
-    if indicator not in supported_indicators:
-        raise ValueError(
-            f"Indicator '{indicator}' is not supported. "
-            f"Available indicators: {supported_indicators}"
-        )
+def get_indicators(
+    symbol: Annotated[str, "ticker symbol of the company"],
+    indicator: Annotated[str, "technical indicator"],
+    curr_date: Annotated[str, "The current trading date, YYYY-mm-dd"],
+    look_back_days: Annotated[int, "how many days to display"] = 30,
+    raw: bool = False,
+) -> str:
+    """获取技术指标数据 - 从 SQLite 缓存
 
-    # 固定获取1年数据以确保所有指标计算准确（参考 y_finance.py 的做法）
-    # 200 SMA 需要200天，加上缓冲，所以用365天
-    DATA_WINDOW_DAYS = 365
-
-    # 计算数据获取范围（用于计算）
-    curr_date_dt = datetime.strptime(curr_date, "%Y-%m-%d")
-    data_start_dt = curr_date_dt - relativedelta(days=DATA_WINDOW_DAYS)
-
-    # 显示范围（用于输出）
-    display_start_dt = curr_date_dt - relativedelta(days=look_back_days)
-
-    normalized_symbol = _convert_symbol(symbol)
-    ts_code = normalized_symbol
-    start_dt = data_start_dt.strftime("%Y%m%d")
-    end_dt = curr_date_dt.strftime("%Y%m%d")
-
-    try:
-        pro = _get_pro()
-        df = pro.daily(ts_code=ts_code, start_date=start_dt, end_date=end_dt)
-
-        if df.empty:
-            return f"No data found for {symbol}"
-
-        # 按日期升序排列
-        df = df.sort_values("trade_date")
-
-        df = df.rename(columns={
-            "trade_date": "Date",
-            "open": "Open",
-            "high": "High",
-            "low": "Low",
-            "close": "Close",
-            "vol": "Volume"  # Tushare vol 单位是手(每手100股)
-        })
-        df["Date"] = pd.to_datetime(df["Date"])
-        try:
-            from stockstats import wrap
-
-            wrapped = wrap(df)
-            _ = wrapped[indicator]
-        except ImportError:
-            wrapped = calculate_indicator_frame(df, indicator)
-
-        value_by_date = {}
-        for _, row in wrapped.iterrows():
-            value_by_date[row["Date"].strftime("%Y-%m-%d")] = row.get(indicator)
-
-        # 构建结果（只显示 look_back_days 范围内的数据）
-        result_lines = []
-        current_dt = curr_date_dt
-        while current_dt >= display_start_dt:
-            date_str = current_dt.strftime("%Y-%m-%d")
-            ind_value = value_by_date.get(date_str)
-            if pd.isna(ind_value):
-                result_lines.append(f"{date_str}: N/A: Not a trading day (weekend or holiday)")
-            else:
-                result_lines.append(f"{date_str}: {ind_value}")
-            current_dt = current_dt - relativedelta(days=1)
-
-        result_str = (
-            f"[Tool: get_indicators] [Indicator: {indicator}]\n"
-            f"## {indicator} values from {display_start_dt.strftime('%Y-%m-%d')} to {curr_date}:\n"
-            f"# 计算: 使用1年历史数据确保准确，显示最近 {look_back_days} 天\n\n"
-            + "\n".join(result_lines)
-            + "\n\n"
-            + INDICATOR_DESCRIPTIONS.get(indicator, "No description available.")
-            + "\n\n注意：Volume 单位为手(每手100股)，涉及成交量的指标(VWMA/MFI)需注意单位换算。"
-        )
-
-        return result_str
-
-    except Exception as e:
-        return f"Error getting indicator {indicator} for {symbol}: {str(e)}"
+    Args:
+        raw: False=格式化字符串（LLM用），True=DataFrame（入库用）
+    """
+    return get_provider().get_indicators(symbol, indicator, curr_date, look_back_days, raw=raw)
 
 
 def get_fundamentals(
-    ticker: Annotated[str, "ticker symbol of the company"],
-    curr_date: Annotated[str, "current date"] = None
-):
-    """获取公司基本面数据"""
-    normalized_ticker = _convert_symbol(ticker)
-    ts_code = normalized_ticker
+    ticker: Annotated[str, "ticker symbol"],
+    start_date: Annotated[str | None, "start date for history query"] = None,
+    end_date: Annotated[str | None, "end date for history query"] = None,
+    curr_date: Annotated[str | None, "single date query"] = None,
+    raw: bool = False,
+) -> str:
+    """获取公司基本面数据 - 从 SQLite 缓存
 
-    try:
-        pro = _get_pro()
-
-        # 获取基本信息
-        all_basic = pro.stock_basic()
-        basic = all_basic[all_basic['ts_code'] == ts_code]
-
-        # 获取财务指标
-        indicator = pro.fina_indicator(ts_code=ts_code)
-
-        # 获取市值和估值数据 - 使用 curr_date 参数
-        date_str = curr_date.replace("-", "") if curr_date else datetime.now().strftime("%Y%m%d")
-        daily_basic = pro.daily_basic(ts_code=ts_code, start_date=date_str, end_date=date_str)
-        if daily_basic.empty:
-            daily_basic = pro.daily_basic(ts_code=ts_code, end_date=date_str, limit=1)
-
-        # 获取利润表
-        income = pro.income(ts_code=ts_code)
-
-        # 获取现金流量表
-        cashflow = pro.cashflow(ts_code=ts_code)
-
-        if basic.empty:
-            return f"No fundamentals data found for symbol '{ticker}'"
-
-        # 构建基本面信息
-        lines = []
-        lines.append(f"Ticker: {ts_code}")
-
-        row = basic.iloc[0]
-        lines.append(f"Name: {row.get('name', 'N/A')}")
-        lines.append(f"Industry: {row.get('industry', 'N/A')}")
-        lines.append(f"Market: {row.get('market', 'N/A')}")
-        lines.append(f"Area: {row.get('area', 'N/A')}")
-
-        if not indicator.empty:
-            latest = indicator.iloc[0]
-            lines.append(f"ROE (%): {latest.get('roe', 'N/A')}")
-            lines.append(f"Net Profit Margin (%): {latest.get('netprofit_margin', 'N/A')}")
-            lines.append(f"Gross Profit Margin (%): {latest.get('grossprofit_margin', 'N/A')}")
-            lines.append(f"Debt to Asset Ratio (%): {latest.get('debt_to_assets', 'N/A')}")
-            lines.append(f"Current Ratio: {latest.get('current_ratio', 'N/A')}")
-
-        # 添加市值和估值数据
-        if not daily_basic.empty:
-            db = daily_basic.iloc[0]
-            close = db.get('close', 0)
-            pe = db.get('pe', 0)
-            pe_ttm = db.get('pe_ttm', 0)
-            pb = db.get('pb', 0)
-            total_mv = db.get('total_mv', 0)
-            circ_mv = db.get('circ_mv', 0)
-            total_share = db.get('total_share', 0)
-            if close:
-                lines.append(f"Stock Price (元): {float(close):.2f}")
-            if pe and float(pe) > 0:
-                lines.append(f"P/E Ratio: {float(pe):.2f}")
-            if pe_ttm and float(pe_ttm) > 0:
-                lines.append(f"P/E Ratio (TTM): {float(pe_ttm):.2f}")
-            if pb and float(pb) > 0:
-                lines.append(f"P/B Ratio: {float(pb):.2f}")
-            if total_mv:
-                lines.append(f"Total Market Cap (亿元): {float(total_mv) / 10000:.2f}")
-            if circ_mv:
-                lines.append(f"Circulating Market Cap (亿元): {float(circ_mv) / 10000:.2f}")
-            if total_share:
-                lines.append(f"Total Shares (亿股): {float(total_share) / 10000:.2f}")
-
-        # 添加收入和利润数据（单位：亿元）
-        if not income.empty:
-            inc = income.iloc[0]
-            revenue = inc.get('revenue', 0)
-            n_income = inc.get('n_income', 0)
-            if revenue:
-                lines.append(f"Revenue (亿元): {float(revenue) / 1e8:.2f}")
-            if n_income:
-                lines.append(f"Net Income (亿元): {float(n_income) / 1e8:.2f}")
-
-        # 添加现金流数据（单位：亿元）
-        if not cashflow.empty:
-            cf = cashflow.iloc[0]
-            ocf = cf.get('n_cashflow_act', 0)
-            if ocf:
-                lines.append(f"Operating Cash Flow (亿元): {float(ocf) / 1e8:.2f}")
-
-        # 添加股息历史数据
-        try:
-            dividend_df = pro.dividend(ts_code=ts_code, limit=20)
-            if not dividend_df.empty:
-                lines.append("")
-                lines.append("# Dividend History (分红记录)")
-
-                # 按 end_date 去重，优先显示"实施"状态
-                dividend_df = dividend_df.sort_values('ann_date', ascending=False)
-                # 过滤只显示"实施"状态的记录（实际执行的分红）
-                implemented = dividend_df[dividend_df['div_proc'] == '实施'].copy()
-                if implemented.empty:
-                    # 如果没有实施记录，显示最新的预案
-                    implemented = dividend_df.drop_duplicates(subset=['end_date'], keep='first')
-
-                for _, div_row in implemented.head(6).iterrows():
-                    end_date = str(div_row.get('end_date', 'N/A'))
-                    year = end_date[:4]
-                    period = "年报" if end_date.endswith('1231') else "半年报" if end_date.endswith('0630') else ""
-                    cash = div_row.get('cash_div', 0)
-                    stk = div_row.get('stk_div', 0)
-                    pay = div_row.get('pay_date', 'N/A')
-                    ex = div_row.get('ex_date', 'N/A')
-
-                    # cash_div 单位是"元/股"，显示时转换为"每10股派现X元"
-                    cash_str = f"每10股派现{float(cash)*10:.2f}元" if cash and float(cash) > 0 else ""
-                    stk_str = f"每10股转增{float(stk):.1f}股" if stk and float(stk) > 0 else ""
-                    pay_str = f", 派息日: {pay}" if pay and str(pay) != 'None' else ""
-                    ex_str = f", 除息日: {ex}" if ex and str(ex) != 'None' else ""
-
-                    div_info = f"{cash_str} {stk_str}".strip()
-                    if not div_info:
-                        div_info = "无分红"
-                    lines.append(f"  {year}年{period}: {div_info}{pay_str}{ex_str}")
-        except Exception:
-            pass
-
-        header = f"# Company Fundamentals for {normalized_ticker}\n"
-        header += f"# Data retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-        header += f"# Data source: Tushare (citydata.club proxy)\n"
-        header += f"# Unit: 亿元 (100M CNY) for monetary values, % for ratios\n"
-        header += f"# Conversion: 1亿元 = 0.1 Billion CNY = 100 Million CNY\n\n"
-
-        return header + "\n".join(lines)
-
-    except Exception as e:
-        return f"Error retrieving fundamentals for {ticker}: {str(e)}"
+    Args:
+        start_date: 开始日期（日期范围查询）
+        end_date: 结束日期（日期范围查询）
+        curr_date: 单日查询（返回该日期数据）
+        raw: False=格式化字符串（LLM用），True=DataFrame（入库用）
+    """
+    return get_provider().get_fundamentals(ticker, start_date, end_date, curr_date, raw=raw)
 
 
 def get_balance_sheet(
-    ticker: Annotated[str, "ticker symbol of the company"],
-    freq: Annotated[str, "frequency of data: 'annual' or 'quarterly'"] = "quarterly",
-    curr_date: Annotated[str, "current date in YYYY-MM-DD format"] = None
-):
-    """获取资产负债表"""
-    normalized_ticker = _convert_symbol(ticker)
-    ts_code = normalized_ticker
-
-    try:
-        pro = _get_pro()
-        df = pro.balancesheet(ts_code=ts_code)
-
-        if df.empty:
-            return f"No balance sheet data found for symbol '{ticker}'"
-
-        df = df.sort_values("end_date", ascending=False)
-
-        if freq == "quarterly":
-            df = df.head(8)
-        else:
-            df = df.head(4)
-
-        csv_string = df.to_csv(index=False)
-
-        header = f"# Balance Sheet data for {normalized_ticker} ({freq})\n"
-        header += f"# Data retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-        header += f"# Data source: Tushare (citydata.club proxy)\n"
-        header += f"# Unit: Yuan (CNY) | Divide by 1e9 for Billion, 1e6 for Million\n"
-        header += f"# Example: 8604456558 Yuan = 8.60 Billion CNY\n\n"
-
-        return header + csv_string
-
-    except Exception as e:
-        return f"Error retrieving balance sheet for {ticker}: {str(e)}"
-
-
-def _calculate_single_quarter_cashflow(df):
-    """从累计值计算单季现金流值
+    ticker: Annotated[str, "ticker symbol"],
+    freq: Annotated[str, "frequency: 'annual' or 'quarterly'"] = "quarterly",
+    curr_date: Annotated[str | None, "current date"] = None,
+    raw: bool = False,
+) -> str:
+    """获取资产负债表 - 从 SQLite 缓存
 
     Args:
-        df: 现金流数据，包含 end_date, end_type, n_cashflow_act, n_cashflow_inv_act, n_cash_flows_fnc_act
-
-    Returns:
-        dict: {end_date: {'ocf': 单季经营现金流, 'icf': 单季投资现金流, 'fcf': 单季筹资现金流}}
+        raw: False=格式化字符串（LLM用），True=DataFrame（入库用）
     """
-    df = df.copy()
-    df['year'] = df['end_date'].astype(str).str[:4]
-
-    single_q_values = {}
-
-    for year in df['year'].unique():
-        year_df = df[df['year'] == year]
-
-        # Q1 (end_type=1) 本身就是单季
-        q1 = year_df[year_df['end_type'] == '1']
-        if not q1.empty:
-            q1_row = q1.iloc[0]
-            q1_date = q1_row['end_date']
-            single_q_values[q1_date] = {
-                'ocf': q1_row.get('n_cashflow_act', 0) or 0,
-                'icf': q1_row.get('n_cashflow_inv_act', 0) or 0,
-                'fcf': q1_row.get('n_cash_flows_fnc_act', 0) or 0
-            }
-
-        # Q2单季 = Q2累计 - Q1累计
-        q2 = year_df[year_df['end_type'] == '2']
-        if not q2.empty and not q1.empty:
-            q2_row = q2.iloc[0]
-            q2_date = q2_row['end_date']
-            q1_ocf = q1.iloc[0].get('n_cashflow_act', 0) or 0
-            q1_icf = q1.iloc[0].get('n_cashflow_inv_act', 0) or 0
-            q1_fcf = q1.iloc[0].get('n_cash_flows_fnc_act', 0) or 0
-            q2_ocf = q2_row.get('n_cashflow_act', 0) or 0
-            q2_icf = q2_row.get('n_cashflow_inv_act', 0) or 0
-            q2_fcf = q2_row.get('n_cash_flows_fnc_act', 0) or 0
-            single_q_values[q2_date] = {
-                'ocf': q2_ocf - q1_ocf,
-                'icf': q2_icf - q1_icf,
-                'fcf': q2_fcf - q1_fcf
-            }
-
-        # Q3单季 = Q3累计 - Q2累计
-        q3 = year_df[year_df['end_type'] == '3']
-        if not q3.empty and not q2.empty:
-            q3_row = q3.iloc[0]
-            q3_date = q3_row['end_date']
-            q2_ocf = q2.iloc[0].get('n_cashflow_act', 0) or 0
-            q2_icf = q2.iloc[0].get('n_cashflow_inv_act', 0) or 0
-            q2_fcf = q2.iloc[0].get('n_cash_flows_fnc_act', 0) or 0
-            q3_ocf = q3_row.get('n_cashflow_act', 0) or 0
-            q3_icf = q3_row.get('n_cashflow_inv_act', 0) or 0
-            q3_fcf = q3_row.get('n_cash_flows_fnc_act', 0) or 0
-            single_q_values[q3_date] = {
-                'ocf': q3_ocf - q2_ocf,
-                'icf': q3_icf - q2_icf,
-                'fcf': q3_fcf - q2_fcf
-            }
-
-        # 年报/Q4单季 = 年报累计 - Q3累计
-        annual = year_df[year_df['end_type'] == '4']
-        if not annual.empty and not q3.empty:
-            annual_row = annual.iloc[0]
-            annual_date = annual_row['end_date']
-            q3_ocf = q3.iloc[0].get('n_cashflow_act', 0) or 0
-            q3_icf = q3.iloc[0].get('n_cashflow_inv_act', 0) or 0
-            q3_fcf = q3.iloc[0].get('n_cash_flows_fnc_act', 0) or 0
-            annual_ocf = annual_row.get('n_cashflow_act', 0) or 0
-            annual_icf = annual_row.get('n_cashflow_inv_act', 0) or 0
-            annual_fcf = annual_row.get('n_cash_flows_fnc_act', 0) or 0
-            single_q_values[annual_date] = {
-                'ocf': annual_ocf - q3_ocf,
-                'icf': annual_icf - q3_icf,
-                'fcf': annual_fcf - q3_fcf
-            }
-
-    return single_q_values
+    return get_provider().get_balance_sheet(ticker, freq, curr_date, raw=raw)
 
 
 def get_cashflow(
-    ticker: Annotated[str, "ticker symbol of the company"],
-    freq: Annotated[str, "frequency of data: 'annual' or 'quarterly'"] = "quarterly",
-    curr_date: Annotated[str, "current date in YYYY-MM-DD format"] = None
-):
-    """获取现金流量表 - 同时返回累计值和单季值"""
-    normalized_ticker = _convert_symbol(ticker)
-    ts_code = normalized_ticker
+    ticker: Annotated[str, "ticker symbol"],
+    freq: Annotated[str, "frequency: 'annual' or 'quarterly'"] = "quarterly",
+    curr_date: Annotated[str | None, "current date"] = None,
+    raw: bool = False,
+) -> str:
+    """获取现金流量表 - 从 SQLite 缓存
 
-    try:
-        pro = _get_pro()
-        df = pro.cashflow(ts_code=ts_code)
-
-        if df.empty:
-            return f"No cash flow data found for symbol '{ticker}'"
-
-        # 去重处理 - 优先使用修正后的数据 (update_flag=1)
-        if 'update_flag' in df.columns:
-            df['_sort_key'] = df['update_flag'].astype(int) * 10000000000 + df['ann_date'].astype(int)
-            df = df.sort_values('_sort_key', ascending=False)
-            df = df.drop_duplicates(subset=['end_date', 'end_type'], keep='first')
-            df = df.drop(columns=['_sort_key'])
-        else:
-            df = df.sort_values('ann_date', ascending=False)
-            df = df.drop_duplicates(subset=['end_date', 'end_type'], keep='first')
-
-        # 计算单季值
-        single_q_values = _calculate_single_quarter_cashflow(df)
-
-        df = df.sort_values("end_date", ascending=False)
-
-        if freq == "quarterly":
-            df_display = df.head(8)
-        else:
-            df_display = df.head(4)
-
-        lines = []
-        lines.append(f"# Cash Flow data for {normalized_ticker} ({freq})")
-        lines.append("# 数据口径：累计值（年初至报告期末）+ 单季值（计算得出）")
-        lines.append("# 来源：Tushare 最新报表，不含会计差错更正后数据")
-        lines.append("# Unit: 亿元 (100M CNY) | 1亿元 = 0.1 Billion CNY\n")
-
-        # 现金流数据表
-        lines.append(f"{'报告期':<10} {'类型':>4} {'累计经营(亿)':>12} {'单季经营(亿)':>12} {'累计投资(亿)':>12} {'单季投资(亿)':>12} {'累计筹资(亿)':>12} {'单季筹资(亿)':>12}")
-        lines.append("-" * 95)
-
-        period_type_map = {'1': 'Q1', '2': 'Q2', '3': 'Q3', '4': '年报'}
-        for _, row in df_display.iterrows():
-            period = str(row.get('end_date', 'N/A'))[:8]
-            end_type = str(row.get('end_type', 'N/A'))
-            period_type = period_type_map.get(end_type, end_type)
-
-            # 累计值
-            ocf_cum = row.get('n_cashflow_act', 0) or 0
-            icf_cum = row.get('n_cashflow_inv_act', 0) or 0
-            fcf_cum = row.get('n_cash_flows_fnc_act', 0) or 0
-
-            # 单季值
-            end_date = row.get('end_date')
-            single_q = single_q_values.get(end_date, {'ocf': 0, 'icf': 0, 'fcf': 0})
-            ocf_single = single_q['ocf']
-            icf_single = single_q['icf']
-            fcf_single = single_q['fcf']
-
-            ocf_cum_str = f"{float(ocf_cum)/1e8:.2f}"
-            ocf_single_str = f"{float(ocf_single)/1e8:.2f}"
-            icf_cum_str = f"{float(icf_cum)/1e8:.2f}"
-            icf_single_str = f"{float(icf_single)/1e8:.2f}"
-            fcf_cum_str = f"{float(fcf_cum)/1e8:.2f}"
-            fcf_single_str = f"{float(fcf_single)/1e8:.2f}"
-
-            lines.append(f"{period:<10} {period_type:>4} {ocf_cum_str:>12} {ocf_single_str:>12} {icf_cum_str:>12} {icf_single_str:>12} {fcf_cum_str:>12} {fcf_single_str:>12}")
-
-        return "\n".join(lines)
-
-    except Exception as e:
-        return f"Error retrieving cash flow for {ticker}: {str(e)}"
+    Args:
+        raw: False=格式化字符串（LLM用），True=DataFrame（入库用）
+    """
+    return get_provider().get_cashflow(ticker, freq, curr_date, raw=raw)
 
 
 def get_income_statement(
-    ticker: Annotated[str, "ticker symbol of the company"],
-    freq: Annotated[str, "frequency of data: 'annual' or 'quarterly'"] = "quarterly",
-    curr_date: Annotated[str, "current date in YYYY-MM-DD format"] = None
-):
-    """获取利润表"""
-    normalized_ticker = _convert_symbol(ticker)
-    ts_code = normalized_ticker
+    ticker: Annotated[str, "ticker symbol"],
+    freq: Annotated[str, "frequency: 'annual' or 'quarterly'"] = "quarterly",
+    curr_date: Annotated[str | None, "current date"] = None,
+    raw: bool = False,
+) -> str:
+    """获取利润表 - 从 SQLite 缓存
 
-    try:
-        pro = _get_pro()
-        df = pro.income(ts_code=ts_code)
-
-        if df.empty:
-            return f"No income statement data found for symbol '{ticker}'"
-
-        df = df.sort_values("end_date", ascending=False)
-
-        if freq == "quarterly":
-            df = df.head(8)
-        else:
-            df = df.head(4)
-
-        csv_string = df.to_csv(index=False)
-
-        header = f"# Income Statement data for {normalized_ticker} ({freq})\n"
-        header += f"# Data retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-        header += f"# Data source: Tushare (citydata.club proxy)\n"
-        header += f"# Unit: Yuan (CNY) | Divide by 1e9 for Billion, 1e6 for Million\n"
-        header += f"# Example: 1160730703 Yuan = 1.16 Billion CNY = 1160.73 Million CNY\n\n"
-
-        return header + csv_string
-
-    except Exception as e:
-        return f"Error retrieving income statement for {ticker}: {str(e)}"
+    Args:
+        raw: False=格式化字符串（LLM用），True=DataFrame（入库用）
+    """
+    return get_provider().get_income_statement(ticker, freq, curr_date, raw=raw)
 
 
 def get_insider_transactions(
-    ticker: Annotated[str, "ticker symbol of the company"]
-):
-    """获取高管和股东增减持数据（从本地 SQLite 读取）。"""
-    try:
-        normalized_ticker = _convert_symbol(ticker)
-    except ValueError as exc:
-        return f"Error retrieving insider transactions for {ticker}: {str(exc)}"
+    ticker: Annotated[str, "ticker symbol"],
+    raw: bool = False,
+) -> str:
+    """获取高管增减持数据 - 从 SQLite 缓存
 
-    try:
-        pro = _get_pro()
-        df = pro.stk_rewards(ts_code=normalized_ticker)
+    Args:
+        raw: False=格式化字符串（LLM用），True=DataFrame（入库用）
+    """
+    return get_provider().get_insider_transactions(ticker, raw=raw)
 
-        if df.empty:
-            return f"No insider transactions data found for '{normalized_ticker}'"
 
-        df = df.sort_values("ann_date", ascending=False)
+# ========== 别名（兼容现有调用）==========
 
-        # 字段说明
-        field_names = {
-            "ts_code": "股票代码",
-            "ann_date": "公告日期",
-            "end_date": "报告期",
-            "name": "姓名",
-            "title": "职务",
-            "type": "类型",
-            "reward": "薪酬",
-            "holding_shares": "持股数量",
-            "in_deal": "买入数量",
-            "out_deal": "卖出数量",
-            "change_reason": "变动原因",
-        }
+get_Tushare_data_online = get_stock_data
+get_stock_stats_indicators_window = get_indicators
 
-        # 只保留已知字段
-        available_fields = [f for f in field_names.keys() if f in df.columns]
-        df = df[available_fields]
 
-        # 重命名为中文
-        df = df.rename(columns=field_names)
+# ========== 批量计算函数（从 SQLite 读数据，本地计算）==========
 
-        # 转换日期格式
-        if "公告日期" in df.columns:
-            df["公告日期"] = df["公告日期"].astype(str)
-        if "报告期" in df.columns:
-            df["报告期"] = df["报告期"].astype(str)
+from .calculator import calc_peg_ratio_batch, calc_yoy_growth_batch
 
-        # 取最近 30 条
-        df = df.head(30)
 
-        csv_string = df.to_csv(index=False)
+def get_peg_ratio_batch(
+    ticker: Annotated[str, "ticker symbol"],
+    start_date: Annotated[str | None, "start date"] = None,
+    end_date: Annotated[str | None, "end date"] = None,
+) -> str:
+    """批量计算 PEG（从 SQLite 读数据，本地计算）
 
-        header = f"# 高管与股东增减持数据 - {normalized_ticker}\n"
-        header += f"# 共 {len(df)} 条记录\n"
-        header += f"# Data retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-        header += f"# Data source: Tushare (citydata.club proxy)\n\n"
+    Args:
+        ticker: 股票代码
+        start_date: 开始日期（可选）
+        end_date: 结束日期（可选）
 
-        return header + csv_string
+    Returns:
+        DataFrame: end_date, pe_ttm, n_income, n_income_yoy, peg, valuation
+    """
+    from .provider import get_provider
+    ts_code = get_provider()._normalize_symbol(ticker)
+    return calc_peg_ratio_batch(ts_code, start_date, end_date)
 
-    except FileNotFoundError as exc:
-        return (
-            f"SQLite mirror not found for '{normalized_ticker}'. "
-            f"Has the sync been run? Error: {str(exc)}"
-        )
-    except Exception as e:
-        return f"Error retrieving insider transactions for {ticker}: {str(e)}"
+
+def get_yoy_growth_batch(
+    ticker: Annotated[str, "ticker symbol"],
+) -> str:
+    """批量计算增长率（从 SQLite 读数据，本地计算）
+
+    Args:
+        ticker: 股票代码
+
+    Returns:
+        DataFrame: end_date, revenue, n_income, revenue_yoy, n_income_yoy
+    """
+    from .provider import get_provider
+    ts_code = get_provider()._normalize_symbol(ticker)
+    return calc_yoy_growth_batch(ts_code)

@@ -216,6 +216,42 @@ uv run tradingagents test 600519.SH --date 2026-04-19
 
 ---
 
+---
+
+## 数据单位规范
+
+### 标准单位表
+
+| 类型 | 单位 | 说明 |
+|------|------|------|
+| 货币金额 | 元 (CNY) | 所有 monetary value 输出 |
+| 股份数量 | 股 | 所有 share count 输出 |
+| 百分比 | % | ratios、增长率 |
+
+### 单位换算规则
+
+| 来源 | 目标 | 转换 |
+|------|------|------|
+| 万元 | 元 | `* 10000` |
+| 万股 | 股 | `* 10000` |
+| 千元 | 元 | `* 1000` |
+| 亿元 | 元 | `* 100000000` |
+
+### 实施层级
+
+1. **Storage layer (sync pipeline)**：数据入库前完成单位转换，SQLite 存储元/股
+2. **Display layer (data.py)**：输出时不再做二次转换，直接显示元/股
+
+### 正确示例
+
+```python
+# 错误 - 输出亿元
+f"Total Market Cap (亿元): {float(total_mv) / 10000:.2f}"
+
+# 正确 - 输出元
+f"Total Market Cap (元): {float(total_mv) * 10000:.2f}"
+```
+
 ## 参考
 
 详细设计见：[datahub-design.md](datahub-design.md) 第十章"如何扩展"
