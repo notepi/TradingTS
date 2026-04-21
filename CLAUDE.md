@@ -8,8 +8,8 @@
 
 ```bash
 # 一条命令：启动 Dashboard → 分析 → 关闭端口
-uv run tradingagents test 688333.SH --date 2026-04-14
-2026-04-14是日期，要自己修改
+uv run tradingagents test 688333.SH --date 2026-04-19
+2026-04-19是日期，要自己修改
 ```
 
 ### Dashboard 网页

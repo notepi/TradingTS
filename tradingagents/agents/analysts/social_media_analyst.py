@@ -1,14 +1,23 @@
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.messages import AIMessage
 from tradingagents.agents.utils.agent_utils import (
     build_instrument_context,
     get_output_language_instruction,
     load_agent_tools,
+    load_local_report,
 )
 from datasource.datahub.servers.config import get_config
 
 
 def create_social_media_analyst(llm):
     def social_media_analyst_node(state):
+        # 尝试从本地加载报告（根据 report_source 配置）
+        local_report = load_local_report("social_media_analyst", state)
+        if local_report:
+            result = AIMessage(content=local_report)
+            return {"messages": [result], "sentiment_report": local_report}
+
+        # 原有逻辑：LLM 生成报告
         current_date = state["trade_date"]
         instrument_context = build_instrument_context(state["company_of_interest"])
 

@@ -5,9 +5,22 @@
 #
 # usage 字段：专业工具的使用说明，会自动追加到 prompt。
 # 无 usage 的工具依赖 description（通过 bind_tools 发送）。
+#
+# report_source 配置（可选）：控制报告来源
+# - mode: "llm_generate" (默认) 大模型自动生成
+# - mode: "local_file" 直接从本地文件读取
+# - path_template: 支持 {results_dir}, {ticker}, {agent_name} 动态变量
+# - on_missing: fallback_to_llm / error / empty
 
 agents:
   fundamentals_analyst:
+    # ===== 报告来源配置 =====
+    report_source:
+      mode: "local_file"  # 开关：llm_generate / local_file
+      local_file:
+        path_template: "{results_dir}/{ticker}/reports/fundamentals_report.md"
+        on_missing: "fallback_to_llm"  # 文件不存在时回退到大模型生成
+
     tools:
       - name: get_fundamentals
       - name: get_balance_sheet

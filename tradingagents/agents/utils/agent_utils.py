@@ -12,6 +12,95 @@ def load_agents_registry() -> dict:
     return yaml.safe_load(config_path.read_text())
 
 
+def load_report_source_config(agent_name: str) -> dict:
+    """从 agents_registry.yaml 加载报告来源配置。
+
+    Args:
+        agent_name: 智能体名称（如 fundamentals_analyst）
+
+    Returns:
+        dict: 报告来源配置，无配置时返回默认模式 {"mode": "llm_generate"}
+    """
+    registry = load_agents_registry()
+    agent_config = registry.get("agents", {}).get(agent_name, {})
+    return agent_config.get("report_source", {"mode": "llm_generate"})
+
+
+def resolve_report_path(path_template: str, state: dict) -> Path:
+    """解析报告路径模板中的动态变量。
+
+    支持变量:
+    - {results_dir}: 从配置获取的结果目录
+    - {ticker}: 从 state["company_of_interest"] 获取
+    - {agent_name}: 分析师名称（去掉 _analyst 后缀）
+
+    Args:
+        path_template: 路径模板字符串
+        state: 当前 AgentState
+
+    Returns:
+        Path: 解析后的文件路径
+    """
+    from datasource.datahub.servers.config import get_config
+
+    config = get_config()
+    results_dir = config.get("results_dir", "./results")
+
+    # 从 agent_name 推断报告名称（去掉 _analyst 后缀）
+    ticker = state.get("company_of_interest", "")
+
+    replacements = {
+        "{results_dir}": results_dir,
+        "{ticker}": ticker,
+    }
+
+    resolved_path = path_template
+    for var, value in replacements.items():
+        resolved_path = resolved_path.replace(var, value)
+
+    return Path(resolved_path)
+
+
+def load_local_report(agent_name: str, state: dict) -> str | None:
+    """从本地文件加载报告。
+
+    Args:
+        agent_name: 智能体名称（如 fundamentals_analyst）
+        state: 当前 AgentState
+
+    Returns:
+        str | None: 报告内容，文件不存在或模式不匹配时返回 None
+    """
+    report_config = load_report_source_config(agent_name)
+
+    if report_config.get("mode") != "local_file":
+        return None
+
+    local_config = report_config.get("local_file", {})
+
+    # 解析路径模板
+    path_template = local_config.get(
+        "path_template",
+        "{results_dir}/{ticker}/reports/{agent_name}_report.md"
+    )
+    # 替换 {agent_name} 变量（去掉 _analyst 后缀）
+    agent_short_name = agent_name.replace("_analyst", "")
+    path_template = path_template.replace("{agent_name}", agent_short_name)
+
+    path = resolve_report_path(path_template, state)
+
+    if not path.exists():
+        on_missing = local_config.get("on_missing", "fallback_to_llm")
+        if on_missing == "fallback_to_llm":
+            return None
+        elif on_missing == "error":
+            raise FileNotFoundError(f"Report file not found: {path}")
+        elif on_missing == "empty":
+            return ""
+
+    return path.read_text(encoding="utf-8")
+
+
 def load_agent_tools(agent_name: str) -> list:
     """从配置加载智能体工具列表。
 

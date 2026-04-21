@@ -38,11 +38,16 @@ def _resolve_batch_id(batch_id: str | None) -> str:
 
 
 def _resolve_as_of_date(as_of_date: str | None) -> datetime:
-    """解析日期"""
+    """解析日期，支持 YYYY-MM-DD 或 YYYYMMDD 格式"""
     if as_of_date:
+        # 支持 YYYY-MM-DD 和 YYYYMMDD 两种格式
+        if "-" in as_of_date:
+            return datetime.strptime(as_of_date, "%Y-%m-%d")
         return datetime.strptime(as_of_date, "%Y%m%d")
     env_date = os.getenv("SYNC_BATCH_DATE")
     if env_date:
+        if "-" in env_date:
+            return datetime.strptime(env_date, "%Y-%m-%d")
         return datetime.strptime(env_date, "%Y%m%d")
     return datetime.utcnow()
 
