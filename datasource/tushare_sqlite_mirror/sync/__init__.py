@@ -5,5 +5,6 @@ sync - 数据同步入库模块
 """
 
 from .pipeline import run_pipeline, run_bootstrap, run_daily_sync
+from .technical_pipeline import run_technical_pipeline
 
-__all__ = ["run_pipeline", "run_bootstrap", "run_daily_sync"]
+__all__ = ["run_pipeline", "run_bootstrap", "run_daily_sync", "run_technical_pipeline"]

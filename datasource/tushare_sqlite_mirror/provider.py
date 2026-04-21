@@ -276,3 +276,228 @@ class SQLiteMirrorProvider(StockDataProvider):
             return pd.DataFrame()
 
         return df
+
+    # ========== 技术分析表查询 ==========
+
+    def _fetch_price_daily(self, ts_code: str, start_date: str, end_date: str) -> pd.DataFrame:
+        """获取 price_daily 数据"""
+        df = self._query("price_daily", {"symbol": ts_code}, order_by="trade_date ASC")
+
+        if df.empty:
+            return pd.DataFrame()
+
+        # 过滤日期范围
+        df["trade_date"] = pd.to_datetime(df["trade_date"])
+        start_dt = pd.to_datetime(start_date)
+        end_dt = pd.to_datetime(end_date)
+        df = df[(df["trade_date"] >= start_dt) & (df["trade_date"] <= end_dt)]
+
+        if df.empty:
+            return pd.DataFrame()
+
+        df["trade_date"] = df["trade_date"].dt.strftime("%Y-%m-%d")
+
+        # 移除元数据列
+        cols = ["trade_date", "open", "high", "low", "close", "vol"]
+        df = df[[c for c in cols if c in df.columns]]
+
+        return df
+
+    def _fetch_trend_ma_daily(self, ts_code: str, start_date: str, end_date: str) -> pd.DataFrame:
+        """获取 trend_ma_daily 数据"""
+        df = self._query("trend_ma_daily", {"symbol": ts_code}, order_by="trade_date ASC")
+
+        if df.empty:
+            return pd.DataFrame()
+
+        # 过滤日期范围
+        df["trade_date"] = pd.to_datetime(df["trade_date"])
+        start_dt = pd.to_datetime(start_date)
+        end_dt = pd.to_datetime(end_date)
+        df = df[(df["trade_date"] >= start_dt) & (df["trade_date"] <= end_dt)]
+
+        if df.empty:
+            return pd.DataFrame()
+
+        df["trade_date"] = df["trade_date"].dt.strftime("%Y-%m-%d")
+
+        # 移除元数据列
+        meta_cols = ["synced_at", "source", "batch_id"]
+        df = df[[c for c in df.columns if c not in meta_cols]]
+
+        return df
+
+    def _fetch_momentum_volatility_daily(self, ts_code: str, start_date: str, end_date: str) -> pd.DataFrame:
+        """获取 momentum_volatility_daily 数据"""
+        df = self._query("momentum_volatility_daily", {"symbol": ts_code}, order_by="trade_date ASC")
+
+        if df.empty:
+            return pd.DataFrame()
+
+        # 过滤日期范围
+        df["trade_date"] = pd.to_datetime(df["trade_date"])
+        start_dt = pd.to_datetime(start_date)
+        end_dt = pd.to_datetime(end_date)
+        df = df[(df["trade_date"] >= start_dt) & (df["trade_date"] <= end_dt)]
+
+        if df.empty:
+            return pd.DataFrame()
+
+        df["trade_date"] = df["trade_date"].dt.strftime("%Y-%m-%d")
+
+        # 移除元数据列
+        meta_cols = ["synced_at", "source", "batch_id"]
+        df = df[[c for c in df.columns if c not in meta_cols]]
+
+        return df
+
+    def _fetch_technical_labels_daily(self, ts_code: str, start_date: str, end_date: str) -> pd.DataFrame:
+        """获取 technical_labels_daily 数据"""
+        df = self._query("technical_labels_daily", {"symbol": ts_code}, order_by="trade_date ASC")
+
+        if df.empty:
+            return pd.DataFrame()
+
+        # 过滤日期范围
+        df["trade_date"] = pd.to_datetime(df["trade_date"])
+        start_dt = pd.to_datetime(start_date)
+        end_dt = pd.to_datetime(end_date)
+        df = df[(df["trade_date"] >= start_dt) & (df["trade_date"] <= end_dt)]
+
+        if df.empty:
+            return pd.DataFrame()
+
+        df["trade_date"] = df["trade_date"].dt.strftime("%Y-%m-%d")
+
+        # 移除元数据列
+        meta_cols = ["synced_at", "source", "batch_id"]
+        df = df[[c for c in df.columns if c not in meta_cols]]
+
+        return df
+
+    # ========== 技术分析表公开方法 ==========
+
+    def get_price_daily(
+        self,
+        symbol: str,
+        start_date: str,
+        end_date: str,
+        raw: bool = False,
+    ) -> str | pd.DataFrame:
+        """获取技术分析行情数据 - price_daily 表"""
+        ts_code = self._normalize_symbol(symbol)
+        df = self._fetch_price_daily(ts_code, start_date, end_date)
+
+        if df.empty:
+            return f"No price_daily data found for '{symbol}' between {start_date} and {end_date}"
+
+        if raw:
+            df["symbol"] = ts_code
+            return df
+
+        return self._format_price_daily(df, ts_code, start_date, end_date)
+
+    def get_trend_ma_daily(
+        self,
+        symbol: str,
+        start_date: str,
+        end_date: str,
+        raw: bool = False,
+    ) -> str | pd.DataFrame:
+        """获取均线趋势数据 - trend_ma_daily 表"""
+        ts_code = self._normalize_symbol(symbol)
+        df = self._fetch_trend_ma_daily(ts_code, start_date, end_date)
+
+        if df.empty:
+            return f"No trend_ma_daily data found for '{symbol}' between {start_date} and {end_date}"
+
+        if raw:
+            df["symbol"] = ts_code
+            return df
+
+        return self._format_trend_ma_daily(df, ts_code, start_date, end_date)
+
+    def get_momentum_volatility_daily(
+        self,
+        symbol: str,
+        start_date: str,
+        end_date: str,
+        raw: bool = False,
+    ) -> str | pd.DataFrame:
+        """获取动量波动数据 - momentum_volatility_daily 表"""
+        ts_code = self._normalize_symbol(symbol)
+        df = self._fetch_momentum_volatility_daily(ts_code, start_date, end_date)
+
+        if df.empty:
+            return f"No momentum_volatility_daily data found for '{symbol}' between {start_date} and {end_date}"
+
+        if raw:
+            df["symbol"] = ts_code
+            return df
+
+        return self._format_momentum_volatility_daily(df, ts_code, start_date, end_date)
+
+    def get_technical_labels_daily(
+        self,
+        symbol: str,
+        start_date: str,
+        end_date: str,
+        raw: bool = False,
+    ) -> str | pd.DataFrame:
+        """获取技术标签数据 - technical_labels_daily 表"""
+        ts_code = self._normalize_symbol(symbol)
+        df = self._fetch_technical_labels_daily(ts_code, start_date, end_date)
+
+        if df.empty:
+            return f"No technical_labels_daily data found for '{symbol}' between {start_date} and {end_date}"
+
+        if raw:
+            df["symbol"] = ts_code
+            return df
+
+        return self._format_technical_labels_daily(df, ts_code, start_date, end_date)
+
+    # ========== 技术分析表格式化输出 ==========
+
+    def _format_price_daily(self, df: pd.DataFrame, ts_code: str, start_date: str, end_date: str) -> str:
+        """格式化 price_daily 输出"""
+        header = f"[Tool: get_price_daily] # 技术分析行情 {ts_code}\n"
+        header += f"# 日期范围: {start_date} ~ {end_date}\n"
+        header += f"# 记录数: {len(df)}\n"
+        header += f"# 数据来源: {self.source_name}\n"
+        header += "# 复权类型: qfq（前复权）\n"
+        header += "# 注意: 不同复权方式的价格序列不同，技术指标数值可能与外部数据源有差异\n\n"
+        return header + df.to_csv(index=False)
+
+    def _format_trend_ma_daily(self, df: pd.DataFrame, ts_code: str, start_date: str, end_date: str) -> str:
+        """格式化 trend_ma_daily 输出"""
+        header = f"[Tool: get_trend_ma_daily] # 均线趋势 {ts_code}\n"
+        header += f"# 日期范围: {start_date} ~ {end_date}\n"
+        header += f"# 记录数: {len(df)}\n"
+        header += f"# 数据来源: {self.source_name}\n"
+        header += "# 复权类型: qfq（前复权）\n"
+        header += "# 注意: SMA/EMA 基于前复权价格计算，与后复权数据源的数值可能不同\n\n"
+        return header + df.to_csv(index=False)
+
+    def _format_momentum_volatility_daily(self, df: pd.DataFrame, ts_code: str, start_date: str, end_date: str) -> str:
+        """格式化 momentum_volatility_daily 输出"""
+        header = f"[Tool: get_momentum_volatility_daily] # 动量波动 {ts_code}\n"
+        header += f"# 日期范围: {start_date} ~ {end_date}\n"
+        header += f"# 记录数: {len(df)}\n"
+        header += f"# 数据来源: {self.source_name}\n"
+        header += "#\n"
+        header += "# 字段解释:\n"
+        header += "# - macd_hist = macd_dif - macd_dea; hist>0 表示 DIF>DEA, hist<0 表示 DIF<DEA\n"
+        header += "# - 负数比较示例: hist=0.69>0 表示 DIF(-1.02) > DEA(-1.72)\n"
+        header += "# - vol_avg_5/vol_avg_20: 5日/20日均量, 不同窗口, 数值不同\n"
+        header += "# - high_60d/low_60d: 过去60个交易日(约3个月)的最高/最低价, 不是日历月份\n"
+        header += "#\n\n"
+        return header + df.to_csv(index=False)
+
+    def _format_technical_labels_daily(self, df: pd.DataFrame, ts_code: str, start_date: str, end_date: str) -> str:
+        """格式化 technical_labels_daily 输出"""
+        header = f"[Tool: get_technical_labels_daily] # 技术标签 {ts_code}\n"
+        header += f"# 日期范围: {start_date} ~ {end_date}\n"
+        header += f"# 记录数: {len(df)}\n"
+        header += f"# 数据来源: {self.source_name}\n\n"
+        return header + df.to_csv(index=False)

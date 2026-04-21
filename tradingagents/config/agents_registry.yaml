@@ -31,8 +31,10 @@ agents:
 
   market_analyst:
     tools:
-      - name: get_stock_data
-      - name: get_indicators
+      - name: get_price_daily
+      - name: get_trend_ma_daily
+      - name: get_momentum_volatility_daily
+      - name: get_technical_labels_daily
 
   social_analyst:
     tools:

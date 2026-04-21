@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from .pipeline import run_bootstrap, run_daily_sync, run_pipeline
+from .technical_pipeline import run_technical_pipeline
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -36,6 +37,14 @@ def build_parser() -> argparse.ArgumentParser:
     sync_daily_parser.add_argument("--batch-id", dest="batch_id", help="Optional sync batch id.")
     sync_daily_parser.add_argument("--curr-date", dest="curr_date", help="Current date (YYYY-MM-DD, defaults to today)")
 
+    # technical 子命令（技术分析表同步）
+    technical_parser = subparsers.add_parser("technical", help="Sync technical analysis tables (PRD market_prd.md)")
+    technical_parser.add_argument("--db", dest="db_path", required=True, help="Path to the SQLite mirror file.")
+    technical_parser.add_argument("--symbol", required=True, help="Stock symbol to sync (e.g. 688333.SH)")
+    technical_parser.add_argument("--start-date", dest="start_date", required=True, help="Start date (YYYY-MM-DD)")
+    technical_parser.add_argument("--end-date", dest="end_date", required=True, help="End date (YYYY-MM-DD)")
+    technical_parser.add_argument("--batch-id", dest="batch_id", help="Optional sync batch id.")
+
     return parser
 
 
@@ -61,6 +70,14 @@ def main(argv: list[str] | None = None) -> int:
             start_date=args.start_date,
             end_date=args.end_date,
             indicators=args.indicators,
+        )
+    elif args.command == "technical":
+        run_technical_pipeline(
+            db_path,
+            batch_id=args.batch_id,
+            symbol=args.symbol,
+            start_date=args.start_date,
+            end_date=args.end_date,
         )
 
     return 0

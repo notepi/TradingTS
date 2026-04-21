@@ -45,8 +45,16 @@ from .data import (
     get_yoy_growth_batch,
 )
 
+# 技术分析表查询函数
+from .data import (
+    get_price_daily,
+    get_trend_ma_daily,
+    get_momentum_volatility_daily,
+    get_technical_labels_daily,
+)
+
 # sync 入库函数
-from .sync import run_pipeline, run_bootstrap, run_daily_sync
+from .sync import run_pipeline, run_bootstrap, run_daily_sync, run_technical_pipeline
 
 __all__ = [
     # SQLite 缓存 API
@@ -70,8 +78,14 @@ __all__ = [
     # 批量计算
     "get_peg_ratio_batch",
     "get_yoy_growth_batch",
+    # 技术分析表
+    "get_price_daily",
+    "get_trend_ma_daily",
+    "get_momentum_volatility_daily",
+    "get_technical_labels_daily",
     # sync 入库
     "run_pipeline",
     "run_bootstrap",
     "run_daily_sync",
+    "run_technical_pipeline",
 ]

@@ -22,6 +22,11 @@ FUNCTION_TABLE_MAP = {
     "get_peg_ratio": "peg_ratio",
     "get_yoy_growth": "yoy_growth",
     "get_insider_transactions": "insider_transactions",
+    # 技术分析表（PRD market_prd.md）
+    "get_price_daily": "price_daily",
+    "get_trend_ma_daily": "trend_ma_daily",
+    "get_momentum_volatility_daily": "momentum_volatility_daily",
+    "get_technical_labels_daily": "technical_labels_daily",
 }
 
 # 每个表的唯一键（用于 upsert）
@@ -35,6 +40,11 @@ TABLE_UNIQUE_KEYS = {
     "peg_ratio": ["ts_code", "end_date", "end_type"],
     "yoy_growth": ["ts_code", "end_date", "end_type"],
     "insider_transactions": ["ts_code", "ann_date", "name"],
+    # 技术分析表
+    "price_daily": ["symbol", "trade_date"],
+    "trend_ma_daily": ["symbol", "trade_date"],
+    "momentum_volatility_daily": ["symbol", "trade_date"],
+    "technical_labels_daily": ["symbol", "trade_date"],
 }
 
 # 元数据列（自动添加到所有表）
@@ -122,6 +132,11 @@ def ensure_table(connection: sqlite3.Connection, table_name: str, frame: pd.Data
         connection.execute(
             f'CREATE INDEX IF NOT EXISTS "ix_{table_name}_end_date" '
             f'ON "{table_name}" ("ts_code", "end_date")'
+        )
+    elif table_name in {"price_daily", "trend_ma_daily", "momentum_volatility_daily", "technical_labels_daily"}:
+        connection.execute(
+            f'CREATE INDEX IF NOT EXISTS "ix_{table_name}_date" '
+            f'ON "{table_name}" ("symbol", "trade_date")'
         )
 
 

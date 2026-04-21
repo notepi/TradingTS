@@ -6,6 +6,8 @@ datasource.tushare_sqlite_mirror.data - SQLite 缓存数据接口
 
 from typing import Annotated
 
+import pandas as pd
+
 # 从 tushare 导入常量
 from datasource.tushare.data import INDICATOR_DESCRIPTIONS
 
@@ -161,3 +163,85 @@ def get_yoy_growth_batch(
     from .provider import get_provider
     ts_code = get_provider()._normalize_symbol(ticker)
     return calc_yoy_growth_batch(ts_code)
+
+
+# ========== 技术分析表查询函数 ==========
+
+def get_price_daily(
+    symbol: Annotated[str, "ticker symbol"],
+    start_date: Annotated[str, "start date YYYY-MM-DD"],
+    end_date: Annotated[str, "end date YYYY-MM-DD"],
+    raw: bool = False,
+) -> str | pd.DataFrame:
+    """获取技术分析行情数据 - price_daily 表
+
+    Args:
+        symbol: 股票代码
+        start_date: 开始日期
+        end_date: 结束日期
+        raw: False=格式化字符串（LLM用），True=DataFrame（入库用）
+
+    Returns:
+        格式化字符串或 DataFrame
+    """
+    return get_provider().get_price_daily(symbol, start_date, end_date, raw=raw)
+
+
+def get_trend_ma_daily(
+    symbol: Annotated[str, "ticker symbol"],
+    start_date: Annotated[str, "start date YYYY-MM-DD"],
+    end_date: Annotated[str, "end date YYYY-MM-DD"],
+    raw: bool = False,
+) -> str | pd.DataFrame:
+    """获取均线趋势数据 - trend_ma_daily 表
+
+    Args:
+        symbol: 股票代码
+        start_date: 开始日期
+        end_date: 结束日期
+        raw: False=格式化字符串（LLM用），True=DataFrame（入库用）
+
+    Returns:
+        格式化字符串或 DataFrame（包含 SMA/EMA + 趋势标签）
+    """
+    return get_provider().get_trend_ma_daily(symbol, start_date, end_date, raw=raw)
+
+
+def get_momentum_volatility_daily(
+    symbol: Annotated[str, "ticker symbol"],
+    start_date: Annotated[str, "start date YYYY-MM-DD"],
+    end_date: Annotated[str, "end date YYYY-MM-DD"],
+    raw: bool = False,
+) -> str | pd.DataFrame:
+    """获取动量波动数据 - momentum_volatility_daily 表
+
+    Args:
+        symbol: 股票代码
+        start_date: 开始日期
+        end_date: 结束日期
+        raw: False=格式化字符串（LLM用），True=DataFrame（入库用）
+
+    Returns:
+        格式化字符串或 DataFrame（包含 RSI/MACD/ATR + 状态标签）
+    """
+    return get_provider().get_momentum_volatility_daily(symbol, start_date, end_date, raw=raw)
+
+
+def get_technical_labels_daily(
+    symbol: Annotated[str, "ticker symbol"],
+    start_date: Annotated[str, "start date YYYY-MM-DD"],
+    end_date: Annotated[str, "end date YYYY-MM-DD"],
+    raw: bool = False,
+) -> str | pd.DataFrame:
+    """获取技术标签数据 - technical_labels_daily 表
+
+    Args:
+        symbol: 股票代码
+        start_date: 开始日期
+        end_date: 结束日期
+        raw: False=格式化字符串（LLM用），True=DataFrame（入库用）
+
+    Returns:
+        格式化字符串或 DataFrame（包含综合趋势/动量/风险标签）
+    """
+    return get_provider().get_technical_labels_daily(symbol, start_date, end_date, raw=raw)
