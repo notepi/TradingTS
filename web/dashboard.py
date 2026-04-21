@@ -11,8 +11,12 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Dict
 
+import pandas as pd
+
 from dotenv import load_dotenv
 from rich.console import Console
+
+from datasource.tushare_sqlite_mirror.provider import get_provider as get_sqlite_provider
 
 from web.runtime import (
     ANALYST_AGENT_NAMES,
@@ -86,6 +90,159 @@ ANALYST_OPTIONS = [
     {"label": "News Analyst", "value": "news"},
     {"label": "Fundamentals Analyst", "value": "fundamentals"},
 ]
+
+# ========== 股票行情 API 配置 ==========
+STOCK_NAME_MAP = {
+    "688333.SH": "柔宇科技",
+    "600519.SH": "贵州茅台",
+    "000001.SZ": "平安银行",
+}
+
+
+def _get_stock_info(symbol: str) -> Dict[str, Any]:
+    """获取股票基础信息"""
+    name = STOCK_NAME_MAP.get(symbol, symbol)
+    market = "SH" if symbol.endswith(".SH") else "SZ" if symbol.endswith(".SZ") else "Unknown"
+    return {"code": symbol, "name": name, "market": market}
+
+
+def _get_stock_market_data(symbol: str, start_date: str, end_date: str) -> Dict[str, Any]:
+    """获取股票行情数据（合并多表）"""
+    provider = get_sqlite_provider()
+
+    # 1. 获取 K 线数据
+    price_df = provider._fetch_price_daily(symbol, start_date, end_date)
+    if price_df.empty:
+        return {"data": [], "meta": {"symbol": symbol, "name": STOCK_NAME_MAP.get(symbol, symbol), "total_records": 0}}
+
+    # 2. 获取均线数据
+    ma_df = provider._fetch_trend_ma_daily(symbol, start_date, end_date)
+
+    # 3. 获取技术指标数据
+    tech_df = provider._fetch_momentum_volatility_daily(symbol, start_date, end_date)
+
+    # 4. 获取技术标签数据
+    labels_df = provider._fetch_technical_labels_daily(symbol, start_date, end_date)
+
+    # 5. 合并数据 - 使用 merge 方式
+    merged = price_df.copy()
+
+    if not ma_df.empty:
+        # 选择需要的均线列并重命名
+        ma_cols = ["trade_date", "sma_5", "sma_10", "sma_20", "sma_50", "sma_120", "sma_200"]
+        ma_subset = ma_df[ma_cols].copy() if all(c in ma_df.columns for c in ma_cols) else ma_df.copy()
+        merged = merged.merge(ma_subset, on="trade_date", how="left")
+
+    if not tech_df.empty:
+        tech_cols = ["trade_date", "rsi_6", "rsi_14", "macd_dif", "macd_dea", "macd_hist", "atr_14"]
+        tech_subset = tech_df[tech_cols].copy() if all(c in tech_df.columns for c in tech_cols) else tech_df.copy()
+        merged = merged.merge(tech_subset, on="trade_date", how="left")
+
+    if not labels_df.empty:
+        label_cols = ["trade_date", "short_trend_label", "mid_trend_label", "rsi_label", "macd_label"]
+        labels_subset = labels_df[label_cols].copy() if all(c in labels_df.columns for c in label_cols) else labels_df.copy()
+        merged = merged.merge(labels_subset, on="trade_date", how="left")
+
+    # 6. 计算涨跌幅
+    merged = merged.sort_values("trade_date")
+    merged["prev_close"] = merged["close"].shift(1)
+    merged["change_pct"] = ((merged["close"] - merged["prev_close"]) / merged["prev_close"] * 100).round(2)
+
+    def _safe_float(val, decimals=2):
+        """Safe float conversion - returns None for NaN/None values"""
+        if val is None or pd.isna(val):
+            return None
+        return round(float(val), decimals)
+
+    # 7. 构建返回数据
+    data = []
+    for _, row in merged.iterrows():
+        data.append({
+            "trade_date": row["trade_date"],
+            "open": _safe_float(row.get("open")),
+            "high": _safe_float(row.get("high")),
+            "low": _safe_float(row.get("low")),
+            "close": _safe_float(row.get("close")),
+            "vol": _safe_float(row.get("vol"), 2),
+            "change_pct": _safe_float(row.get("change_pct"), 2),
+            "ma5": _safe_float(row.get("sma_5"), 2),
+            "ma10": _safe_float(row.get("sma_10"), 2),
+            "ma20": _safe_float(row.get("sma_20"), 2),
+            "ma50": _safe_float(row.get("sma_50"), 2),
+            "rsi6": _safe_float(row.get("rsi_6"), 1),
+            "rsi14": _safe_float(row.get("rsi_14"), 1),
+            "macd_dif": _safe_float(row.get("macd_dif"), 4),
+            "macd_dea": _safe_float(row.get("macd_dea"), 4),
+            "macd_hist": _safe_float(row.get("macd_hist"), 4),
+            "atr14": _safe_float(row.get("atr_14"), 2),
+            "short_trend": row.get("short_trend_label") if not pd.isna(row.get("short_trend_label")) else None,
+            "mid_trend": row.get("mid_trend_label") if not pd.isna(row.get("mid_trend_label")) else None,
+            "rsi_zone": row.get("rsi_label") if not pd.isna(row.get("rsi_label")) else None,
+            "macd_state": row.get("macd_label") if not pd.isna(row.get("macd_label")) else None,
+        })
+
+    return {
+        "data": data,
+        "meta": {
+            "symbol": symbol,
+            "name": STOCK_NAME_MAP.get(symbol, symbol),
+            "start_date": start_date,
+            "end_date": end_date,
+            "total_records": len(data),
+        },
+    }
+
+
+def _get_stock_stats(symbol: str) -> Dict[str, Any]:
+    """获取股票最新统计概览"""
+    provider = get_sqlite_provider()
+
+    # 获取最近 60 天数据
+    today = datetime.date.today()
+    start_date = (today - datetime.timedelta(days=60)).isoformat()
+    end_date = today.isoformat()
+
+    market_data = _get_stock_market_data(symbol, start_date, end_date)
+    data = market_data.get("data", [])
+
+    if not data:
+        return {"stats": {"latest": None, "range_stats": None}}
+
+    latest = data[-1]
+    change_pct = latest.get("change_pct", 0) or 0
+
+    # 计算区间统计
+    closes = [d["close"] for d in data if d["close"]]
+    highs = [d["high"] for d in data if d["high"]]
+    lows = [d["low"] for d in data if d["low"]]
+    vols = [d["vol"] for d in data if d["vol"]]
+
+    range_high = max(highs) if highs else 0
+    range_low = min(lows) if lows else 0
+    amplitude = ((range_high - range_low) / range_low * 100) if range_low > 0 else 0
+
+    stats = {
+        "latest": {
+            "trade_date": latest["trade_date"],
+            "close": latest["close"],
+            "change_pct": change_pct,
+            "change_direction": "up" if change_pct > 0 else "down" if change_pct < 0 else "flat",
+            "vol": latest["vol"],
+            "ma5_position": "above" if latest["close"] > (latest.get("ma5") or 0) else "below",
+            "rsi14_zone": "overbought" if (latest.get("rsi14") or 50) > 70 else "oversold" if (latest.get("rsi14") or 50) < 30 else "neutral",
+            "macd_state": latest.get("macd_state") or "N/A",
+            "trend_signal": latest.get("short_trend") or latest.get("mid_trend") or "N/A",
+        },
+        "range_stats": {
+            "period_days": len(data),
+            "high": round(range_high, 2),
+            "low": round(range_low, 2),
+            "amplitude": round(amplitude, 2),
+            "avg_vol": round(sum(vols) / len(vols) if vols else 0, 0),
+        },
+    }
+
+    return {"stats": stats}
 RUNTIME_AGENT_FILE_MAP = {
     "Market Analyst": Path("1_analysts/market.md"),
     "Social Analyst": Path("1_analysts/sentiment.md"),
@@ -1096,6 +1253,42 @@ def serve_dashboard(host: str = "127.0.0.1", port: int = 8765) -> None:
                 return
             if path == "/api/state":
                 self._write_json(HTTPStatus.OK, session.snapshot())
+                return
+
+            # ========== 股票行情 API ==========
+            if path == "/api/stock/info":
+                query = self.path.split("?", 1)[-1] if "?" in self.path else ""
+                params = dict(p.split("=") for p in query.split("&") if "=" in p)
+                symbol = params.get("symbol", "")
+                if not symbol:
+                    self._write_json(HTTPStatus.BAD_REQUEST, {"error": "symbol is required"})
+                    return
+                self._write_json(HTTPStatus.OK, {"info": _get_stock_info(symbol)})
+                return
+
+            if path == "/api/stock/market":
+                query = self.path.split("?", 1)[-1] if "?" in self.path else ""
+                params = dict(p.split("=") for p in query.split("&") if "=" in p)
+                symbol = params.get("symbol", "")
+                start_date = params.get("start_date", "")
+                end_date = params.get("end_date", "")
+                if not symbol:
+                    self._write_json(HTTPStatus.BAD_REQUEST, {"error": "symbol is required"})
+                    return
+                if not start_date or not end_date:
+                    self._write_json(HTTPStatus.BAD_REQUEST, {"error": "start_date and end_date are required"})
+                    return
+                self._write_json(HTTPStatus.OK, _get_stock_market_data(symbol, start_date, end_date))
+                return
+
+            if path == "/api/stock/stats":
+                query = self.path.split("?", 1)[-1] if "?" in self.path else ""
+                params = dict(p.split("=") for p in query.split("&") if "=" in p)
+                symbol = params.get("symbol", "")
+                if not symbol:
+                    self._write_json(HTTPStatus.BAD_REQUEST, {"error": "symbol is required"})
+                    return
+                self._write_json(HTTPStatus.OK, _get_stock_stats(symbol))
                 return
             self._write_json(HTTPStatus.NOT_FOUND, {"error": "Not found"})
 

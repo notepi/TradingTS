@@ -29,7 +29,7 @@ export default function Dashboard() {
 
     api.getState().then((state) => {
       setSnapshot(state);
-      setSelections(state.selections);
+      setSelections(state.selections ?? null);
       if (state.error) {
         setError(state.error);
       } else {
@@ -45,7 +45,7 @@ export default function Dashboard() {
       try {
         const state = await api.getState();
         setSnapshot(state);
-        setSelections(state.selections);
+        setSelections(state.selections ?? null);
         if (state.error) {
           setError(state.error);
         } else {
@@ -64,7 +64,7 @@ export default function Dashboard() {
     try {
       const state = await api.startAnalysis(payload as Parameters<typeof api.startAnalysis>[0]);
       setSnapshot(state);
-      setSelections(state.selections);
+      setSelections(state.selections ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to start analysis");
     }
@@ -84,7 +84,7 @@ export default function Dashboard() {
     try {
       const state = await api.resetDashboard();
       setSnapshot(state);
-      setSelections(state.selections);
+      setSelections(state.selections ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to reset");
     }

@@ -34,7 +34,7 @@ export function WorkflowOverview({ snapshot }: WorkflowOverviewProps) {
   return (
     <div className="space-y-3">
       <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-        Workflow Overview
+        工作流概览
       </h2>
 
       <div className="grid grid-cols-5 gap-3">
@@ -79,7 +79,7 @@ export function WorkflowOverview({ snapshot }: WorkflowOverviewProps) {
                   {runtimeStage?.status?.toUpperCase() || "PENDING"}
                 </Badge>
                 <span className="text-[10px] text-muted-foreground font-mono">
-                  Step {stageIndex + 1}
+                  步骤 {stageIndex + 1}
                 </span>
               </div>
 
@@ -88,7 +88,7 @@ export function WorkflowOverview({ snapshot }: WorkflowOverviewProps) {
                   {stage.title}
                 </h3>
                 <p className="text-[10px] text-muted-foreground mt-0.5">
-                  {completedAgents} / {totalAgents} agents
+                  {completedAgents} / {totalAgents} 智能体
                 </p>
               </div>
 
@@ -130,7 +130,7 @@ export function WorkflowOverview({ snapshot }: WorkflowOverviewProps) {
                 })}
                 {visibleRoles.length > 3 && (
                   <p className="text-[9px] text-muted-foreground text-center">
-                    +{visibleRoles.length - 3} more
+                    +{visibleRoles.length - 3} 更多
                   </p>
                 )}
               </div>

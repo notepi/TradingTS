@@ -51,10 +51,10 @@ export function ProcessTree({ snapshot }: ProcessTreeProps) {
   const filteredTree = processTree
     .map((stage) => ({
       ...stage,
-      agents: stage.agents
+      agents: (stage.agents || [])
         .map((agent) => ({
           ...agent,
-          filteredEvents: agent.events.filter((e) =>
+          filteredEvents: (agent.events || []).filter((e) =>
             eventFilter === "all" ? true : e.type === eventFilter
           ),
         }))
@@ -67,7 +67,7 @@ export function ProcessTree({ snapshot }: ProcessTreeProps) {
     .filter((stage) =>
       eventFilter === "all"
         ? true
-        : stage.agents.length > 0 || stage.id === currentStageId
+        : (stage.agents || []).length > 0 || stage.id === currentStageId
     );
 
   const totalFilteredEvents = filteredTree.reduce(
@@ -81,7 +81,7 @@ export function ProcessTree({ snapshot }: ProcessTreeProps) {
       <div className="p-4 border-b border-border">
         <div className="flex items-center justify-between">
           <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-            Process Tree
+            执行流程
           </h2>
           <div className="flex items-center gap-3">
             <div className="flex gap-1">
@@ -103,7 +103,7 @@ export function ProcessTree({ snapshot }: ProcessTreeProps) {
               ))}
             </div>
             <Badge variant="outline" className="text-[10px] font-mono">
-              {totalFilteredEvents} events
+              {totalFilteredEvents} 事件
             </Badge>
           </div>
         </div>
@@ -144,7 +144,7 @@ export function ProcessTree({ snapshot }: ProcessTreeProps) {
                       <span className="text-sm font-medium">{stage.title}</span>
                       <span className="text-[10px] text-muted-foreground">
                         {stage.completed_agents}/{stage.total_agents} agents ·{" "}
-                        {stageEvents} events
+                        {stageEvents} 事件
                       </span>
                       <Badge
                         variant="outline"
@@ -193,7 +193,7 @@ export function ProcessTree({ snapshot }: ProcessTreeProps) {
                                 </Badge>
                               )}
                               <span className="text-[10px] text-muted-foreground ml-auto">
-                                {events.length} events
+                                {events.length} 事件
                               </span>
                             </div>
 
@@ -204,7 +204,7 @@ export function ProcessTree({ snapshot }: ProcessTreeProps) {
                                 ))}
                                 {events.length > 5 && (
                                   <p className="text-[10px] text-muted-foreground text-center py-1">
-                                    +{events.length - 5} more events
+                                    +{events.length - 5} 更多事件
                                   </p>
                                 )}
                               </div>

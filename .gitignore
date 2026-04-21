@@ -218,8 +218,11 @@ __marimo__/
 # Cache
 **/data_cache/
 
-# Results
-results/
+# Results (ignore all except pre-staged reports directory)
+results/*
+!results/688333.SH/
+results/688333.SH/*
+!results/688333.SH/reports/
 
 # Database files
 *.db

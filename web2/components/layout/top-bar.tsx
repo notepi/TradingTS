@@ -1,6 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import type { Snapshot } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -37,7 +39,7 @@ export function TopBar({ snapshot }: TopBarProps) {
     <header className="h-12 border-b border-border bg-card px-4 flex items-center justify-between">
       <div className="flex items-center gap-6">
         <h1 className="text-sm font-semibold tracking-tight">
-          TradingAgents
+          智能体交易系统
         </h1>
 
         <div className="flex items-center gap-3">
@@ -52,17 +54,17 @@ export function TopBar({ snapshot }: TopBarProps) {
           </Badge>
 
           <span className="text-xs text-muted-foreground">
-            <span className="text-muted-foreground/60">Stage:</span>{" "}
+            <span className="text-muted-foreground/60">阶段:</span>{" "}
             <span className="text-foreground">{currentStage}</span>
           </span>
 
           <span className="text-xs text-muted-foreground">
-            <span className="text-muted-foreground/60">Agent:</span>{" "}
+            <span className="text-muted-foreground/60">智能体:</span>{" "}
             <span className="text-foreground">{currentAgent}</span>
           </span>
 
           <span className="text-xs text-muted-foreground">
-            <span className="text-muted-foreground/60">Elapsed:</span>{" "}
+            <span className="text-muted-foreground/60">耗时:</span>{" "}
             <span className="text-foreground font-mono">
               {elapsed != null ? `${elapsed}s` : "--"}
             </span>
@@ -71,6 +73,11 @@ export function TopBar({ snapshot }: TopBarProps) {
       </div>
 
       <div className="flex items-center gap-4">
+        <Link href="/stock/688333.SH">
+          <Button variant="ghost" size="sm" className="text-xs">
+            行情看板
+          </Button>
+        </Link>
         <span className="text-xs text-muted-foreground font-mono truncate max-w-[300px]">
           {resultsPath}
         </span>
